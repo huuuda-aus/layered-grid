@@ -1772,6 +1772,9 @@ function applyTintToDrawnPixels(
   ctx.globalCompositeOperation = "source-atop";
   ctx.fillStyle = tintColor;
   ctx.fillRect(0, 0, width, height);
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillRect(0, 0, width, height);
   ctx.restore();
 }
 

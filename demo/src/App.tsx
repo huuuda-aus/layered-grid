@@ -18,11 +18,11 @@ type EventListener = (event: LayeredGridExternalEvent) => void;
 
 const TINT_PRESETS = [
   { label: "None", value: "transparent" },
-  { label: "Cool Cyan", value: "rgba(75, 227, 194, 0.08)" },
-  { label: "Amber CRT", value: "rgba(255, 166, 64, 0.12)" },
-  { label: "Matrix Green", value: "rgba(96, 255, 128, 0.1)" },
-  { label: "Violet Haze", value: "rgba(174, 119, 255, 0.1)" },
-  { label: "Blood Red", value: "rgba(255, 76, 76, 0.09)" },
+  { label: "Cool Cyan", value: "rgba(75, 227, 194, 0.24)" },
+  { label: "Amber CRT", value: "rgba(255, 166, 64, 0.28)" },
+  { label: "Matrix Green", value: "rgba(96, 255, 128, 0.26)" },
+  { label: "Violet Haze", value: "rgba(174, 119, 255, 0.27)" },
+  { label: "Blood Red", value: "rgba(255, 76, 76, 0.24)" },
 ] as const;
 
 class DemoEventBus implements LayeredGridExternalEventSource {

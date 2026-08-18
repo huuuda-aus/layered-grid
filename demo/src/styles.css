@@ -20,10 +20,7 @@ body,
   margin: 0;
   width: 100%;
   min-height: 100%;
-  background:
-    radial-gradient(1200px 600px at 15% -20%, #24334a 0%, transparent 60%),
-    radial-gradient(900px 500px at 100% 0%, #2f2b18 0%, transparent 55%),
-    linear-gradient(180deg, var(--bg-1), var(--bg-0));
+  background: var(--bg-0);
   color: var(--ink);
   font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
 }
@@ -54,7 +51,7 @@ body,
 
 button {
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, #1d2532, #161b26);
+  background: #171f2c;
   color: var(--ink);
   padding: 8px 12px;
   border-radius: 8px;
@@ -70,7 +67,7 @@ button:hover {
   align-items: center;
   gap: 8px;
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, #1d2532, #161b26);
+  background: #171f2c;
   color: var(--ink);
   padding: 6px 10px;
   border-radius: 8px;
@@ -103,7 +100,7 @@ button:hover {
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 10px;
-  background: linear-gradient(180deg, rgba(36, 44, 58, 0.5), rgba(14, 18, 24, 0.6));
+  background: rgba(14, 18, 24, 0.6);
   overflow: hidden;
   isolation: isolate;
 }
@@ -146,11 +143,6 @@ button:hover {
       rgba(255, 255, 255, 0.02) 1px,
       rgba(0, 0, 0, 0.2) 2px,
       rgba(0, 0, 0, 0.2) 3px
-    ),
-    linear-gradient(
-      to right,
-      rgba(255, 0, 0, 0.03),
-      rgba(0, 255, 255, 0.02)
     );
   mix-blend-mode: multiply;
   opacity: 0.8;
@@ -178,14 +170,12 @@ button:hover {
 }
 
 .grid-shell.tv-mode::after {
-  background: radial-gradient(circle at center, transparent 56%, rgba(0, 0, 0, 0.45) 100%);
+  background: rgba(0, 0, 0, 0.24);
   animation: tv-flicker 4.8s steps(2, end) infinite;
 }
 
 .grid-shell.tv-mode-crt::after {
-  background:
-    radial-gradient(circle at center, transparent 52%, rgba(0, 0, 0, 0.52) 100%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(0, 0, 0, 0.08));
+  background: rgba(0, 0, 0, 0.3);
   animation: tv-flicker 5.2s steps(2, end) infinite;
 }
 
@@ -217,7 +207,7 @@ button:hover {
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 12px;
-  background: linear-gradient(180deg, rgba(31, 39, 56, 0.85), rgba(15, 20, 30, 0.9));
+  background: rgba(15, 20, 30, 0.9);
 }
 
 .panel h2 {
