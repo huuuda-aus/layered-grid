@@ -1148,9 +1148,8 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       const pointerX = state.mode === "depth" ? rect.width / 2 : event.clientX - rect.left;
       const pointerY = state.mode === "depth" ? rect.height / 2 : event.clientY - rect.top;
 
-      const zoomIn = event.deltaY < 0;
-      const factor = zoomIn ? mergedZoom.zoomStepFactor : 1 / mergedZoom.zoomStepFactor;
-      const currentScale = clampedScale;
+      const currentScale = clamp(camera.scale, minScale, maxScale);
+      const factor = Math.exp(-event.deltaY * 0.0018);
       const nextScale = clamp(currentScale * factor, minScale, maxScale);
 
       if (Math.abs(nextScale - currentScale) < 0.0001) {
@@ -1194,7 +1193,6 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
 
       const worldX = pointerX / currentScale - camera.panX;
       const worldY = pointerY / currentScale - camera.panY;
-
       const nextPanX = pointerX / nextScale - worldX;
       const nextPanY = pointerY / nextScale - worldY;
 
@@ -1206,13 +1204,11 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       }, "pointer");
     }, [
       applyCameraIntent,
-      clampedScale,
       data.gridHeight,
       data.gridWidth,
       depthStackHeight,
       maxScale,
       mergedZoom.panPaddingCells,
-      mergedZoom.zoomStepFactor,
       minScale,
       state.activeLayerId,
       state.mode,

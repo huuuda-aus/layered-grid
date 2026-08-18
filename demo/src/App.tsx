@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { LayeredGrid } from "../../src/react";
 import { cellKey, createInitialControlledState, normalizeLayeredGridData, resolveCellId } from "../../src/core";
 import type {
@@ -52,11 +52,13 @@ export function App() {
   const [state, setState] = useState<LayeredGridControlledState>(() => createInitialControlledState(data));
   const [logLines, setLogLines] = useState<string[]>([]);
   const [autoStream, setAutoStream] = useState(false);
-  const [shaderMode, setShaderMode] = useState<"off" | "tv" | "crt">("crt");
+  const [shaderMode, setShaderMode] = useState<"off" | "tv" | "crt" | "crt-glow">("crt");
   const [selectedTint, setSelectedTint] = useState<string>(GRID_VISUAL_CONFIG.globalTintColor ?? "transparent");
+  const [isZoomInteracting, setIsZoomInteracting] = useState(false);
 
   const eventBusRef = useRef(new DemoEventBus());
   const timerRef = useRef<number | null>(null);
+  const zoomSettleTimerRef = useRef<number | null>(null);
 
   const pushLog = (line: string) => {
     setLogLines((prev) => [line, ...prev].slice(0, 10));
@@ -93,6 +95,21 @@ export function App() {
 
   const onCameraChangeIntent = (intent: CameraChangeIntent) => {
     setState((prev) => ({ ...prev, camera: intent.nextCamera }));
+  };
+
+  const onGridWheelCapture = () => {
+    if (!isZoomInteracting) {
+      setIsZoomInteracting(true);
+    }
+
+    if (zoomSettleTimerRef.current !== null) {
+      window.clearTimeout(zoomSettleTimerRef.current);
+    }
+
+    zoomSettleTimerRef.current = window.setTimeout(() => {
+      zoomSettleTimerRef.current = null;
+      setIsZoomInteracting(false);
+    }, 140);
   };
 
   const goToRandomCell = () => {
@@ -148,6 +165,9 @@ export function App() {
       if (prev === "tv") {
         return "crt";
       }
+      if (prev === "crt") {
+        return "crt-glow";
+      }
       return "off";
     });
   };
@@ -157,11 +177,21 @@ export function App() {
     globalTintColor: selectedTint,
   }), [selectedTint]);
 
+  const shaderGlowColor = useMemo(() => deriveGlowTintColor(selectedTint), [selectedTint]);
+  const shaderModeLabel = shaderMode === "crt-glow" ? "CRT + GLOW" : shaderMode.toUpperCase();
+  const gridShellStyle = useMemo(() => ({
+    "--shader-glow-color": shaderGlowColor,
+  }) as CSSProperties, [shaderGlowColor]);
+
   useEffect(() => {
     return () => {
       if (timerRef.current !== null) {
         window.clearInterval(timerRef.current);
         timerRef.current = null;
+      }
+      if (zoomSettleTimerRef.current !== null) {
+        window.clearTimeout(zoomSettleTimerRef.current);
+        zoomSettleTimerRef.current = null;
       }
     };
   }, []);
@@ -181,7 +211,7 @@ export function App() {
         <button onClick={triggerModeToggle}>External: Toggle Mode</button>
         <button onClick={startStopStream}>{autoStream ? "Stop 500ms Stream" : "Start 500ms Stream"}</button>
         <button onClick={cycleShaderMode}>
-          Shader: {shaderMode.toUpperCase()} (cycle)
+          Shader: {shaderModeLabel} (cycle)
         </button>
         <label className="toolbar-field" htmlFor="tint-select">
           Tint
@@ -200,7 +230,11 @@ export function App() {
       </div>
 
       <div className="layout">
-        <section className={`grid-shell${shaderMode !== "off" ? " tv-mode" : ""}${shaderMode === "crt" ? " tv-mode-crt" : ""}`}>
+        <section
+          className={`grid-shell${shaderMode !== "off" ? " tv-mode" : ""}${shaderMode === "crt" || shaderMode === "crt-glow" ? " tv-mode-crt" : ""}${shaderMode === "crt-glow" ? " tv-mode-crt-glow" : ""}${shaderMode === "crt-glow" && isZoomInteracting ? " shader-interacting" : ""}`}
+          style={gridShellStyle}
+          onWheelCapture={onGridWheelCapture}
+        >
           <LayeredGrid
             data={data}
             state={state}
@@ -315,4 +349,24 @@ function createDemoLayerMatrix(rows: number, cols: number): number[][] {
   );
 
   return matrix;
+}
+
+function deriveGlowTintColor(tint: string): string {
+  const rgbaMatch = tint.match(/rgba?\(([^)]+)\)/i);
+  if (!rgbaMatch) {
+    return "rgba(75, 227, 194, 0.45)";
+  }
+
+  const channels = rgbaMatch[1].split(",").map((part) => part.trim());
+  const r = Number(channels[0]);
+  const g = Number(channels[1]);
+  const b = Number(channels[2]);
+  const alpha = channels[3] != null ? Number(channels[3]) : 1;
+
+  if (![r, g, b].every(Number.isFinite)) {
+    return "rgba(75, 227, 194, 0.45)";
+  }
+
+  const glowAlpha = Math.min(0.7, Math.max(0.32, Number.isFinite(alpha) ? alpha * 1.8 : 0.45));
+  return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${glowAlpha.toFixed(3)})`;
 }

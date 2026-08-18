@@ -95,6 +95,7 @@ button:hover {
 }
 
 .grid-shell {
+  --shader-glow-color: rgba(75, 227, 194, 0.45);
   position: relative;
   min-height: 70vh;
   border: 1px solid var(--line);
@@ -123,6 +124,30 @@ button:hover {
     blur(1px)
     drop-shadow(0.6px 0 rgba(255, 70, 70, 0.16))
     drop-shadow(-0.6px 0 rgba(70, 140, 255, 0.16));
+}
+
+.grid-shell.tv-mode-crt-glow > section canvas {
+  filter:
+    contrast(1.24)
+    saturate(0.84)
+    brightness(1.04)
+    blur(1.6px)
+    drop-shadow(0 0 12px var(--shader-glow-color))
+    drop-shadow(0 0 30px var(--shader-glow-color))
+    drop-shadow(0.6px 0 rgba(255, 70, 70, 0.16))
+    drop-shadow(-0.6px 0 rgba(70, 140, 255, 0.16));
+}
+
+.grid-shell.tv-mode-crt-glow.shader-interacting > section canvas {
+  filter:
+    contrast(1.16)
+    saturate(0.76)
+    brightness(0.98)
+    blur(1px)
+    drop-shadow(0 0 4px var(--shader-glow-color))
+    drop-shadow(0 0 12px var(--shader-glow-color))
+    drop-shadow(0.45px 0 rgba(255, 70, 70, 0.14))
+    drop-shadow(-0.45px 0 rgba(70, 140, 255, 0.14));
 }
 
 .grid-shell.tv-mode::before,
@@ -177,6 +202,23 @@ button:hover {
 .grid-shell.tv-mode-crt::after {
   background: rgba(0, 0, 0, 0.3);
   animation: tv-flicker 5.2s steps(2, end) infinite;
+}
+
+.grid-shell.tv-mode-crt-glow::after {
+  background: rgba(0, 0, 0, 0.16);
+  box-shadow:
+    inset 0 0 16px rgba(0, 0, 0, 0.36),
+    0 0 54px var(--shader-glow-color),
+    0 0 108px color-mix(in srgb, var(--shader-glow-color) 90%, transparent);
+  animation: tv-flicker 5.2s steps(2, end) infinite;
+}
+
+.grid-shell.tv-mode-crt-glow.shader-interacting::after {
+  background: rgba(0, 0, 0, 0.22);
+  box-shadow:
+    inset 0 0 14px rgba(0, 0, 0, 0.42),
+    0 0 18px var(--shader-glow-color),
+    0 0 36px color-mix(in srgb, var(--shader-glow-color) 76%, transparent);
 }
 
 @keyframes tv-flicker {
