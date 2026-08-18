@@ -52,7 +52,7 @@ export function App() {
   const [state, setState] = useState<LayeredGridControlledState>(() => createInitialControlledState(data));
   const [logLines, setLogLines] = useState<string[]>([]);
   const [autoStream, setAutoStream] = useState(false);
-  const [shaderMode, setShaderMode] = useState<"off" | "tv" | "crt" | "crt-glow">("crt");
+  const [shaderMode, setShaderMode] = useState<"off" | "tv" | "crt" | "crt-glow">("crt-glow");
   const [selectedTint, setSelectedTint] = useState<string>(GRID_VISUAL_CONFIG.globalTintColor ?? "transparent");
   const [isZoomInteracting, setIsZoomInteracting] = useState(false);
 

@@ -1062,6 +1062,177 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       viewportSize.width,
     ]);
 
+    const animateSelectionZoomFromPointer = useCallback((args: {
+      row: number;
+      col: number;
+      pointerClientX: number;
+      pointerClientY: number;
+      reason: CameraIntentReason;
+    }) => {
+      const viewport = viewportRef.current;
+      if (!viewport) {
+        const centered = centerCameraOnCell({
+          row: args.row,
+          col: args.col,
+          current: interactionCameraRef.current,
+          scale: maxScale,
+          viewportWidth: viewportSize.width,
+          viewportHeight: viewportSize.height,
+          cellWidth,
+          cellHeight,
+          gridWidth: data.gridWidth,
+          gridHeight: data.gridHeight,
+          mode: state.mode,
+          panPaddingCells: mergedZoom.panPaddingCells,
+          depthStackHeight,
+        });
+        animateCameraIntent(centered, args.reason);
+        return;
+      }
+
+      stopRecenteringAnimation();
+
+      const from = interactionCameraRef.current;
+      const startScale = clamp(from.scale, minScale, maxScale);
+      const targetScale = maxScale;
+
+      const targetCentered = centerCameraOnCell({
+        row: args.row,
+        col: args.col,
+        current: from,
+        scale: targetScale,
+        viewportWidth: viewportSize.width,
+        viewportHeight: viewportSize.height,
+        cellWidth,
+        cellHeight,
+        gridWidth: data.gridWidth,
+        gridHeight: data.gridHeight,
+        mode: state.mode,
+        panPaddingCells: mergedZoom.panPaddingCells,
+        depthStackHeight,
+      });
+
+      if (Math.abs(targetScale - startScale) < mergedEffects.transitionEpsilon) {
+        animateCameraIntent(targetCentered, args.reason);
+        return;
+      }
+
+      const rect = viewport.getBoundingClientRect();
+      const pointerX = args.pointerClientX - rect.left;
+      const pointerY = args.pointerClientY - rect.top;
+      const clickWorldX = pointerX / startScale - from.panX;
+      const clickWorldY = pointerY / startScale - from.panY;
+
+      const recenterDurationMs = computeRecenterDurationMs({
+        from,
+        to: targetCentered,
+        scale: startScale,
+        fallbackDurationMs: mergedEffects.transitionDurationMs,
+      });
+
+      recenterCameraStartTimeRef.current = performance.now() - 16.67;
+
+      const tick = (now: number) => {
+        const startTime = recenterCameraStartTimeRef.current ?? now;
+        const elapsed = now - startTime;
+        const rawProgress = clamp(elapsed / recenterDurationMs, 0, 1);
+        const motionProgress = easeInOutCubic(rawProgress);
+        const scale = lerp(startScale, targetScale, motionProgress);
+
+        const clickAnchored = clampCameraToBounds({
+          camera: {
+            ...from,
+            scale,
+            panX: pointerX / scale - clickWorldX,
+            panY: pointerY / scale - clickWorldY,
+          },
+          viewportWidth: viewportSize.width,
+          viewportHeight: viewportSize.height,
+          gridWidth: data.gridWidth,
+          gridHeight: data.gridHeight,
+          cellWidth,
+          cellHeight,
+          mode: state.mode,
+          panPaddingCells: mergedZoom.panPaddingCells,
+          depthStackHeight,
+        });
+
+        const centeredAtScale = centerCameraOnCell({
+          row: args.row,
+          col: args.col,
+          current: from,
+          scale,
+          viewportWidth: viewportSize.width,
+          viewportHeight: viewportSize.height,
+          cellWidth,
+          cellHeight,
+          gridWidth: data.gridWidth,
+          gridHeight: data.gridHeight,
+          mode: state.mode,
+          panPaddingCells: mergedZoom.panPaddingCells,
+          depthStackHeight,
+        });
+
+        const blended = clampCameraToBounds({
+          camera: {
+            ...from,
+            scale,
+            panX: lerp(clickAnchored.panX, centeredAtScale.panX, motionProgress),
+            panY: lerp(clickAnchored.panY, centeredAtScale.panY, motionProgress),
+            focusDepth: lerp(from.focusDepth, targetCentered.focusDepth, motionProgress),
+          },
+          viewportWidth: viewportSize.width,
+          viewportHeight: viewportSize.height,
+          gridWidth: data.gridWidth,
+          gridHeight: data.gridHeight,
+          cellWidth,
+          cellHeight,
+          mode: state.mode,
+          panPaddingCells: mergedZoom.panPaddingCells,
+          depthStackHeight,
+        });
+
+        interactionCameraRef.current = blended;
+        setCameraTweenFrame(blended);
+
+        if (rawProgress < 1) {
+          recenterCameraFrameRef.current = requestAnimationFrame(tick);
+          return;
+        }
+
+        queuedPointerCameraRef.current = null;
+        recenterPendingCommitRef.current = blended;
+        onCameraChangeIntent({
+          prevCamera: committedCameraRef.current,
+          nextCamera: blended,
+          context: nowContext(args.reason),
+        });
+        committedCameraRef.current = blended;
+        interactionCameraRef.current = blended;
+        recenterCameraStartTimeRef.current = null;
+        recenterCameraFrameRef.current = null;
+      };
+
+      tick(performance.now());
+    }, [
+      animateCameraIntent,
+      cellHeight,
+      cellWidth,
+      data.gridHeight,
+      data.gridWidth,
+      depthStackHeight,
+      maxScale,
+      mergedEffects.transitionDurationMs,
+      mergedEffects.transitionEpsilon,
+      mergedZoom.panPaddingCells,
+      minScale,
+      onCameraChangeIntent,
+      state.mode,
+      stopRecenteringAnimation,
+      viewportSize.height,
+      viewportSize.width,
+    ]);
+
     useEffect(() => {
       const anchor = state.selection.selectedCell ?? state.selection.trackedCell;
       const selectionKey = anchor ? `${anchor.layerId}:${anchor.cellId}` : null;
@@ -1103,7 +1274,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
         row: anchor.row,
         col: anchor.col,
         current: interactionCameraRef.current,
-        scale: clampedScale,
+        scale: maxScale,
         viewportWidth: viewportSize.width,
         viewportHeight: viewportSize.height,
         cellWidth,
@@ -1120,11 +1291,11 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       animateCameraIntent,
       cellHeight,
       cellWidth,
-      clampedScale,
       data.gridHeight,
       data.gridWidth,
       depthStackHeight,
       isPointerInteractionActive,
+      maxScale,
       mergedZoom.panPaddingCells,
       state.activeLayerId,
       state.mode,
@@ -1268,23 +1439,13 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
         return;
       }
 
-      const centered = centerCameraOnCell({
+      animateSelectionZoomFromPointer({
         row: hitCell.row,
         col: hitCell.col,
-        current: interactionCameraRef.current,
-        scale: clampedScale,
-        viewportWidth: viewportSize.width,
-        viewportHeight: viewportSize.height,
-        cellWidth,
-        cellHeight,
-        gridWidth: data.gridWidth,
-        gridHeight: data.gridHeight,
-        mode: state.mode,
-        panPaddingCells: mergedZoom.panPaddingCells,
-        depthStackHeight,
+        pointerClientX: event.clientX,
+        pointerClientY: event.clientY,
+        reason: "pointer",
       });
-
-      animateCameraIntent(centered, "programmatic");
       const selectedKey = `${hitCell.layerId}:${hitCell.cellId}`;
       lastSelectionKeyRef.current = selectedKey;
       suppressSelectionRecenterKeyRef.current = selectedKey;
@@ -1301,13 +1462,13 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
     }, [
       activeLayer,
       activeLayerVisual,
-      animateCameraIntent,
+      animateSelectionZoomFromPointer,
       cellHeight,
       cellWidth,
-      clampedScale,
       data.gridHeight,
       data.gridWidth,
       depthStackHeight,
+      maxScale,
       mergedZoom.panPaddingCells,
       onCellSelectIntent,
       state.mode,
@@ -1402,7 +1563,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
         row: hitCell.row,
         col: hitCell.col,
         current: interactionCameraRef.current,
-        scale: clampedScale,
+        scale: maxScale,
         viewportWidth: viewportSize.width,
         viewportHeight: viewportSize.height,
         cellWidth,
