@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Layered Grid</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="toolbar">
+        <div class="title-block">
+          <h1>Layered Game Grid</h1>
+          <p>
+            Wheel: zoom. PageUp/PageDown: layer. Left or middle drag: pan. Click: select active cell.
+          </p>
+        </div>
+        <div class="toolbar-actions">
+          <button id="depthToggle" class="depth-button" type="button" aria-pressed="false">
+            Depth Check: Off
+          </button>
+          <button id="backToActive" class="back-button" type="button" disabled>
+            Back to Active Cell
+          </button>
+          <p id="activeCellLabel" class="status-label">Active cell: 1--</p>
+          <p id="statusLabel" class="status-label">Active layer: 1 / 5</p>
+        </div>
+      </header>
+
+      <section id="viewport" class="viewport" aria-label="Layered game grid view">
+        <div id="scene" class="scene">
+          <div id="gridStack" class="grid-stack" role="grid" aria-label="Game field"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
