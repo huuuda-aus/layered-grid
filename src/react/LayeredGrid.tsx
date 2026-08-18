@@ -703,6 +703,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
           blur: shouldDisableBlur ? 0 : visual.blur,
           layerIndex,
           activeLayerIndex,
+          hoveredCell,
           selectedCell: state.selection.selectedCell,
           trackedCell: state.selection.trackedCell,
           visual: mergedVisual,
@@ -727,6 +728,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       mergedGeometry.depthLayerDistance,
       mergedGeometry.normalLayerDistance,
       mergedVisual,
+      hoveredCell,
       shouldDisableBlur,
       state.activeLayerId,
       effectiveCamera,
@@ -1500,6 +1502,14 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
         return;
       }
 
+      // Recover gracefully if pointer-up happened outside capture and session got stranded.
+      if (event.buttons === 0) {
+        panSessionRef.current = null;
+        setIsPointerInteractionActive(false);
+        updateHoveredCellFromPointer(event.clientX, event.clientY);
+        return;
+      }
+
       const dx = event.clientX - session.startX;
       const dy = event.clientY - session.startY;
       if (!session.moved && Math.hypot(dx, dy) > DRAG_THRESHOLD_PX) {
@@ -1618,6 +1628,13 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
     ]);
 
     const onPointerLeave = useCallback(() => {
+      panSessionRef.current = null;
+      setIsPointerInteractionActive(false);
+      setHoveredCell(null);
+    }, []);
+
+    const onPointerCancel = useCallback(() => {
+      panSessionRef.current = null;
       setIsPointerInteractionActive(false);
       setHoveredCell(null);
     }, []);
@@ -1722,6 +1739,8 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onPointerLeave={onPointerLeave}
+            onPointerCancel={onPointerCancel}
+            onLostPointerCapture={onPointerCancel}
           />
 
           {renderCellOverlay
@@ -1795,6 +1814,7 @@ function drawLayer(
     blur: number;
     layerIndex: number;
     activeLayerIndex: number;
+    hoveredCell: CellRef | null;
     selectedCell: CellRef | null;
     trackedCell: CellRef | null;
     visual: LayeredGridVisualConfig;
@@ -1813,6 +1833,7 @@ function drawLayer(
     blur,
     layerIndex,
     activeLayerIndex,
+    hoveredCell,
     selectedCell,
     trackedCell,
     visual,
@@ -1841,6 +1862,7 @@ function drawLayer(
     }
 
     const cellId = resolveCellId(layer.layerId, cell);
+    const isHovered = hoveredCell?.layerId === layer.layerId && hoveredCell.cellId === cellId;
     const isSelected = selectedCell?.layerId === layer.layerId && selectedCell.cellId === cellId;
     const isTracked = trackedCell?.layerId === layer.layerId && trackedCell.cellId === cellId;
     const inkAlpha = computeLayerInkAlpha(layerIndex, activeLayerIndex, visual);
@@ -1848,8 +1870,10 @@ function drawLayer(
     ctx.lineWidth = Math.max(0.5, visual.strokeWidthAtScale1 * camera.scale);
     ctx.strokeStyle = isSelected || isTracked
       ? visual.selectedCellStrokeColor
+      : isHovered
+        ? "#4be3c2"
       : visual.gridStrokeColor;
-    ctx.globalAlpha = isSelected || isTracked ? opacity : opacity * inkAlpha;
+    ctx.globalAlpha = isSelected || isTracked || isHovered ? opacity : opacity * inkAlpha;
     ctx.strokeRect(x, y, w, h);
   }
   ctx.restore();
@@ -2004,13 +2028,17 @@ function findCellAtClientPoint(args: {
   const rect = viewport.getBoundingClientRect();
   const localX = clientX - rect.left;
   const localY = clientY - rect.top;
+  const effectiveViewportSize: ViewportSize = {
+    width: Math.max(1, rect.width),
+    height: Math.max(1, rect.height),
+  };
 
   for (const cell of Object.values(layer.cells)) {
     const projected = projectCellRect({
       row: cell.row,
       col: cell.col,
       camera,
-      viewportSize,
+      viewportSize: effectiveViewportSize,
       cellWidth,
       cellHeight,
       layerYOffset: layerVisual.yOffset,

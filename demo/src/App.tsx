@@ -54,6 +54,7 @@ export function App() {
   const [autoStream, setAutoStream] = useState(false);
   const [shaderMode, setShaderMode] = useState<"off" | "tv" | "crt" | "crt-glow">("crt-glow");
   const [selectedTint, setSelectedTint] = useState<string>(GRID_VISUAL_CONFIG.globalTintColor ?? "transparent");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isZoomInteracting, setIsZoomInteracting] = useState(false);
 
   const eventBusRef = useRef(new DemoEventBus());
@@ -198,35 +199,37 @@ export function App() {
 
   return (
     <div className="demo-page">
-      <header className="hero">
-        <h1>Layered Grid Controlled Demo</h1>
-        <p>
-          Host controls state, component emits intents, and external actions stream through
-          <strong> externalEventSource</strong>.
-        </p>
-      </header>
+      <div className="top-overlay">
+        <header className="hero">
+          <h1>Layered Grid Controlled Demo</h1>
+          <p>
+            Host controls state, component emits intents, and external actions stream through
+            <strong> externalEventSource</strong>.
+          </p>
+        </header>
 
-      <div className="toolbar">
-        <button onClick={goToRandomCell}>External: Random GoTo</button>
-        <button onClick={triggerModeToggle}>External: Toggle Mode</button>
-        <button onClick={startStopStream}>{autoStream ? "Stop 500ms Stream" : "Start 500ms Stream"}</button>
-        <button onClick={cycleShaderMode}>
-          Shader: {shaderModeLabel} (cycle)
-        </button>
-        <label className="toolbar-field" htmlFor="tint-select">
-          Tint
-          <select
-            id="tint-select"
-            value={selectedTint}
-            onChange={(event) => setSelectedTint(event.target.value)}
-          >
-            {TINT_PRESETS.map((preset) => (
-              <option key={preset.value} value={preset.value}>
-                {preset.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="toolbar">
+          <button onClick={goToRandomCell}>External: Random GoTo</button>
+          <button onClick={triggerModeToggle}>External: Toggle Mode</button>
+          <button onClick={startStopStream}>{autoStream ? "Stop 500ms Stream" : "Start 500ms Stream"}</button>
+          <button onClick={cycleShaderMode}>
+            Shader: {shaderModeLabel} (cycle)
+          </button>
+          <label className="toolbar-field" htmlFor="tint-select">
+            Tint
+            <select
+              id="tint-select"
+              value={selectedTint}
+              onChange={(event) => setSelectedTint(event.target.value)}
+            >
+              {TINT_PRESETS.map((preset) => (
+                <option key={preset.value} value={preset.value}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
       <div className="layout">
@@ -261,7 +264,17 @@ export function App() {
           />
         </section>
 
-        <aside className="panel">
+        {!isSidebarOpen ? (
+          <button className="sidebar-show-tab" onClick={() => setIsSidebarOpen(true)}>
+            Show
+          </button>
+        ) : null}
+
+        <aside className={`panel ${isSidebarOpen ? "panel-open" : "panel-closed"}`}>
+          <div className="panel-header">
+            <h2>Inspector</h2>
+            <button className="panel-toggle" onClick={() => setIsSidebarOpen(false)}>Hide</button>
+          </div>
           <h2>State</h2>
           <pre>{JSON.stringify(state, null, 2)}</pre>
           <h2>Recent Intents</h2>
