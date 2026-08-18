@@ -5,6 +5,7 @@ import type {
 
 export const DEFAULT_LAYERED_GRID_VISUAL_CONFIG: LayeredGridVisualConfig = {
   backgroundColor: "#262626",
+  globalTintColor: "transparent",
   gridStrokeColor: "#ffffff",
   labelColor: "#ffffff",
   selectedCellStrokeColor: "#ffd400",

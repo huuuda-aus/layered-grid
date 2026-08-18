@@ -1,7 +1,8 @@
 import type { LayeredGridVisualConfig } from "../../src/core";
 
 export const GRID_VISUAL_CONFIG: Partial<LayeredGridVisualConfig> = {
-  backgroundColor: "#1f1f1f",
+  backgroundColor: "transparent",
+  globalTintColor: "rgba(75, 227, 194, 0.08)",
   gridStrokeColor: "#ffffff",
   labelColor: "#ffffff",
   selectedCellStrokeColor: "#ffd400",

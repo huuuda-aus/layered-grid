@@ -708,6 +708,10 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
           visual: mergedVisual,
         });
       }
+
+      if (mergedVisual.globalTintColor !== "transparent") {
+        applyTintToDrawnPixels(baseCtx, viewportSize.width, viewportSize.height, mergedVisual.globalTintColor);
+      }
     }, [
       animatedView.focusDepth,
       animatedView.modeBlend,
@@ -752,25 +756,27 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
       overlayCtx.clearRect(0, 0, viewportSize.width, viewportSize.height);
 
-      if (!activeLayer) {
-        return;
+      if (activeLayer) {
+        drawOverlayLabels(overlayCtx, {
+          layer: activeLayer,
+          camera: { ...effectiveCamera, scale: clampedScale },
+          viewportSize,
+          cellWidth,
+          cellHeight,
+          layerYOffset: activeLayerVisual.yOffset,
+          layerZOffset: activeLayerVisual.zOffset,
+          projectedScale: activeLayerVisual.projectedScale,
+          opacity: activeLayerVisual.opacity,
+          hoveredCell,
+          selectedCell: state.selection.selectedCell,
+          trackedCell: state.selection.trackedCell,
+          visual: mergedVisual,
+        });
       }
 
-      drawOverlayLabels(overlayCtx, {
-        layer: activeLayer,
-        camera: { ...effectiveCamera, scale: clampedScale },
-        viewportSize,
-        cellWidth,
-        cellHeight,
-        layerYOffset: activeLayerVisual.yOffset,
-        layerZOffset: activeLayerVisual.zOffset,
-        projectedScale: activeLayerVisual.projectedScale,
-        opacity: activeLayerVisual.opacity,
-        hoveredCell,
-        selectedCell: state.selection.selectedCell,
-        trackedCell: state.selection.trackedCell,
-        visual: mergedVisual,
-      });
+      if (mergedVisual.globalTintColor !== "transparent") {
+        applyTintToDrawnPixels(overlayCtx, viewportSize.width, viewportSize.height, mergedVisual.globalTintColor);
+      }
     }, [
       activeLayer,
       activeLayerVisual.opacity,
@@ -782,6 +788,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       clampedScale,
       hoveredCell,
       mergedVisual,
+      mergedVisual.globalTintColor,
       effectiveCamera,
       state.selection.selectedCell,
       state.selection.trackedCell,
@@ -1752,6 +1759,19 @@ function drawOverlayLabels(
     ctx.fillText(resolveCellVisualId(cell), rect.x + rect.w / 2, rect.y + rect.h / 2);
   }
 
+  ctx.restore();
+}
+
+function applyTintToDrawnPixels(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  tintColor: string,
+): void {
+  ctx.save();
+  ctx.globalCompositeOperation = "source-atop";
+  ctx.fillStyle = tintColor;
+  ctx.fillRect(0, 0, width, height);
   ctx.restore();
 }
 

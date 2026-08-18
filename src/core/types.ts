@@ -82,6 +82,7 @@ export type LayeredGridZoomConfig = {
 export type LayeredGridVisualConfig = {
   // Canvas styling.
   backgroundColor: string;
+  globalTintColor: string;
   gridStrokeColor: string;
   labelColor: string;
   selectedCellStrokeColor: string;

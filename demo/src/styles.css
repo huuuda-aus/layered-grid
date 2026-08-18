@@ -65,6 +65,31 @@ button:hover {
   border-color: var(--accent-2);
 }
 
+.toolbar-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, #1d2532, #161b26);
+  color: var(--ink);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.toolbar-field select {
+  border: 1px solid var(--line);
+  background: #0f141d;
+  color: var(--ink);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+.toolbar-field select:focus-visible {
+  outline: 1px solid var(--accent-2);
+  outline-offset: 1px;
+}
+
 .layout {
   margin-top: 16px;
   display: grid;
@@ -73,15 +98,119 @@ button:hover {
 }
 
 .grid-shell {
+  position: relative;
   min-height: 70vh;
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 10px;
   background: linear-gradient(180deg, rgba(36, 44, 58, 0.5), rgba(14, 18, 24, 0.6));
+  overflow: hidden;
+  isolation: isolate;
 }
 
 .grid-shell > section {
   height: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.grid-shell.tv-mode > section canvas {
+  filter: contrast(1.06) saturate(0.76) brightness(0.9) blur(0.75px);
+}
+
+.grid-shell.tv-mode-crt > section canvas {
+  filter:
+    contrast(1.14)
+    saturate(0.68)
+    brightness(0.92)
+    blur(1px)
+    drop-shadow(0.6px 0 rgba(255, 70, 70, 0.16))
+    drop-shadow(-0.6px 0 rgba(70, 140, 255, 0.16));
+}
+
+.grid-shell.tv-mode::before,
+.grid-shell.tv-mode::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 3;
+}
+
+.grid-shell.tv-mode::before {
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.02) 0px,
+      rgba(255, 255, 255, 0.02) 1px,
+      rgba(0, 0, 0, 0.2) 2px,
+      rgba(0, 0, 0, 0.2) 3px
+    ),
+    linear-gradient(
+      to right,
+      rgba(255, 0, 0, 0.03),
+      rgba(0, 255, 255, 0.02)
+    );
+  mix-blend-mode: multiply;
+  opacity: 0.8;
+}
+
+.grid-shell.tv-mode-crt::before {
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.03) 0px,
+      rgba(255, 255, 255, 0.03) 1px,
+      rgba(0, 0, 0, 0.32) 2px,
+      rgba(0, 0, 0, 0.32) 3px
+    ),
+    repeating-linear-gradient(
+      to right,
+      rgba(255, 40, 40, 0.08) 0px,
+      rgba(255, 40, 40, 0.08) 1px,
+      rgba(40, 255, 150, 0.08) 1px,
+      rgba(40, 255, 150, 0.08) 2px,
+      rgba(80, 120, 255, 0.08) 2px,
+      rgba(80, 120, 255, 0.08) 3px
+    );
+  opacity: 0.92;
+}
+
+.grid-shell.tv-mode::after {
+  background: radial-gradient(circle at center, transparent 56%, rgba(0, 0, 0, 0.45) 100%);
+  animation: tv-flicker 4.8s steps(2, end) infinite;
+}
+
+.grid-shell.tv-mode-crt::after {
+  background:
+    radial-gradient(circle at center, transparent 52%, rgba(0, 0, 0, 0.52) 100%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(0, 0, 0, 0.08));
+  animation: tv-flicker 5.2s steps(2, end) infinite;
+}
+
+@keyframes tv-flicker {
+  0% {
+    opacity: 0.9;
+  }
+  8% {
+    opacity: 0.83;
+  }
+  10% {
+    opacity: 0.9;
+  }
+  53% {
+    opacity: 0.88;
+  }
+  55% {
+    opacity: 0.82;
+  }
+  57% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0.9;
+  }
 }
 
 .panel {

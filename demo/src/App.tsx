@@ -16,6 +16,15 @@ import { GRID_EFFECTS_CONFIG } from "./gridEffects";
 
 type EventListener = (event: LayeredGridExternalEvent) => void;
 
+const TINT_PRESETS = [
+  { label: "None", value: "transparent" },
+  { label: "Cool Cyan", value: "rgba(75, 227, 194, 0.08)" },
+  { label: "Amber CRT", value: "rgba(255, 166, 64, 0.12)" },
+  { label: "Matrix Green", value: "rgba(96, 255, 128, 0.1)" },
+  { label: "Violet Haze", value: "rgba(174, 119, 255, 0.1)" },
+  { label: "Blood Red", value: "rgba(255, 76, 76, 0.09)" },
+] as const;
+
 class DemoEventBus implements LayeredGridExternalEventSource {
   private listeners = new Set<EventListener>();
   private revision = 1;
@@ -43,6 +52,8 @@ export function App() {
   const [state, setState] = useState<LayeredGridControlledState>(() => createInitialControlledState(data));
   const [logLines, setLogLines] = useState<string[]>([]);
   const [autoStream, setAutoStream] = useState(false);
+  const [shaderMode, setShaderMode] = useState<"off" | "tv" | "crt">("crt");
+  const [selectedTint, setSelectedTint] = useState<string>(GRID_VISUAL_CONFIG.globalTintColor ?? "transparent");
 
   const eventBusRef = useRef(new DemoEventBus());
   const timerRef = useRef<number | null>(null);
@@ -129,6 +140,23 @@ export function App() {
     pushLog("stream -> 500ms");
   };
 
+  const cycleShaderMode = () => {
+    setShaderMode((prev) => {
+      if (prev === "off") {
+        return "tv";
+      }
+      if (prev === "tv") {
+        return "crt";
+      }
+      return "off";
+    });
+  };
+
+  const visualConfig = useMemo(() => ({
+    ...GRID_VISUAL_CONFIG,
+    globalTintColor: selectedTint,
+  }), [selectedTint]);
+
   useEffect(() => {
     return () => {
       if (timerRef.current !== null) {
@@ -152,15 +180,32 @@ export function App() {
         <button onClick={goToRandomCell}>External: Random GoTo</button>
         <button onClick={triggerModeToggle}>External: Toggle Mode</button>
         <button onClick={startStopStream}>{autoStream ? "Stop 500ms Stream" : "Start 500ms Stream"}</button>
+        <button onClick={cycleShaderMode}>
+          Shader: {shaderMode.toUpperCase()} (cycle)
+        </button>
+        <label className="toolbar-field" htmlFor="tint-select">
+          Tint
+          <select
+            id="tint-select"
+            value={selectedTint}
+            onChange={(event) => setSelectedTint(event.target.value)}
+          >
+            {TINT_PRESETS.map((preset) => (
+              <option key={preset.value} value={preset.value}>
+                {preset.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <div className="layout">
-        <section className="grid-shell">
+        <section className={`grid-shell${shaderMode !== "off" ? " tv-mode" : ""}${shaderMode === "crt" ? " tv-mode-crt" : ""}`}>
           <LayeredGrid
             data={data}
             state={state}
             externalEventSource={eventBusRef.current}
-            visual={GRID_VISUAL_CONFIG}
+            visual={visualConfig}
             effects={GRID_EFFECTS_CONFIG}
             zoom={{
               minVisibleCells: 2,
