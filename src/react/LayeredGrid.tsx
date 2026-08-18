@@ -1305,7 +1305,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       viewportSize.width,
     ]);
 
-    const onWheel = useCallback((event: React.WheelEvent<HTMLCanvasElement>) => {
+    const onWheel = useCallback((event: WheelEvent) => {
       event.preventDefault();
       stopRecenteringAnimation();
 
@@ -1391,6 +1391,22 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       cellHeight,
       cellWidth,
     ]);
+
+    useEffect(() => {
+      const overlay = overlayCanvasRef.current;
+      if (!overlay) {
+        return;
+      }
+
+      const handleWheel = (event: WheelEvent) => {
+        onWheel(event);
+      };
+
+      overlay.addEventListener("wheel", handleWheel, { passive: false });
+      return () => {
+        overlay.removeEventListener("wheel", handleWheel);
+      };
+    }, [onWheel]);
 
     const onPointerDown = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
       if (event.button !== 0 && event.button !== 1) {
@@ -1702,7 +1718,6 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
             ref={overlayCanvasRef}
             style={canvasStyle}
             aria-label="Layered grid overlay canvas"
-            onWheel={onWheel}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
