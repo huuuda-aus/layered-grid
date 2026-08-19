@@ -306,7 +306,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
     );
 
     const overlayCells = useMemo<CellRenderParams[]>(() => {
-      if (!activeLayer) {
+      if (!renderCellOverlay || !activeLayer) {
         return [];
       }
 
@@ -613,10 +613,9 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
 
       const update = () => {
         const rect = viewport.getBoundingClientRect();
-        setViewportSize({
-          width: Math.max(1, rect.width),
-          height: Math.max(1, rect.height),
-        });
+        const w = Math.max(1, rect.width);
+        const h = Math.max(1, rect.height);
+        setViewportSize((prev) => (prev.width === w && prev.height === h ? prev : { width: w, height: h }));
       };
 
       update();
@@ -1074,6 +1073,9 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       viewportSize.width,
     ]);
 
+    const animateCameraIntentRef = useRef(animateCameraIntent);
+    animateCameraIntentRef.current = animateCameraIntent;
+
     const animateSelectionZoomFromPointer = useCallback((args: {
       row: number;
       col: number;
@@ -1307,9 +1309,8 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
         depthStackHeight,
       });
 
-      animateCameraIntent(centered, "programmatic");
+      animateCameraIntentRef.current(centered, "programmatic");
     }, [
-      animateCameraIntent,
       cellHeight,
       cellWidth,
       data.gridHeight,
