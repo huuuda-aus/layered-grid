@@ -188,6 +188,10 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
 
     const effectiveCamera = cameraTweenFrame ?? state.camera;
     const clampedScale = clamp(effectiveCamera.scale, minScale, maxScale);
+    const displayCamera = useMemo<CameraState>(() => ({
+      ...effectiveCamera,
+      scale: clampedScale,
+    }), [clampedScale, effectiveCamera]);
     const targetFocusDepth = state.mode === "depth"
       ? Math.max(0, activeLayerIndex)
       : Number.isFinite(state.camera.focusDepth)
@@ -199,15 +203,15 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       Math.abs(animatedView.modeBlend - targetModeBlend) >= mergedEffects.transitionEpsilon;
     const shouldDisableBlur = isPointerInteractionActive || isMomentumActive || isTransitionActive;
 
-    function stopMomentum() {
+    const stopMomentum = useCallback(() => {
       if (momentumFrameRef.current !== null) {
         cancelAnimationFrame(momentumFrameRef.current);
         momentumFrameRef.current = null;
       }
       setIsMomentumActive(false);
-    }
+    }, []);
 
-    function stopRecenteringAnimation() {
+    const stopRecenteringAnimation = useCallback(() => {
       if (recenterCameraFrameRef.current !== null) {
         cancelAnimationFrame(recenterCameraFrameRef.current);
         recenterCameraFrameRef.current = null;
@@ -215,7 +219,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       recenterCameraStartTimeRef.current = null;
       recenterPendingCommitRef.current = null;
       setCameraTweenFrame(null);
-    }
+    }, []);
 
     function startMomentum(velocityX: number, velocityY: number) {
       stopMomentum();
@@ -639,9 +643,9 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
         if (isDuplicateExternalEvent(event, processedExternalEventKeysRef.current)) {
           continue;
         }
-        handleExternalEvent(event);
+        handleExternalEventRef.current(event);
       }
-    }, [externalEvents, handleExternalEvent]);
+    }, [externalEvents]);
 
     useEffect(() => {
       if (!externalEventSource) {
@@ -652,9 +656,9 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
         if (isDuplicateExternalEvent(event, processedExternalEventKeysRef.current)) {
           return;
         }
-        handleExternalEvent(event);
+        handleExternalEventRef.current(event);
       });
-    }, [externalEventSource, handleExternalEvent]);
+    }, [externalEventSource]);
 
     useEffect(() => {
       const base = baseCanvasRef.current;
@@ -701,7 +705,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
 
         drawLayer(baseCtx, {
           layer,
-          camera: { ...effectiveCamera, scale: clampedScale },
+          camera: displayCamera,
           viewportSize,
           cellWidth,
           cellHeight,
@@ -712,7 +716,6 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
           blur: shouldDisableBlur ? 0 : visual.blur,
           layerIndex,
           activeLayerIndex,
-          hoveredCell,
           selectedCell: state.selection.selectedCell,
           trackedCell: state.selection.trackedCell,
           visual: mergedVisual,
@@ -727,7 +730,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       animatedView.modeBlend,
       cellHeight,
       cellWidth,
-      clampedScale,
+      displayCamera,
       data.layers,
       mergedEffects.cameraPerspective,
       mergedEffects.deeperLayerOpacityFalloff,
@@ -737,10 +740,8 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       mergedGeometry.depthLayerDistance,
       mergedGeometry.normalLayerDistance,
       mergedVisual,
-      hoveredCell,
       shouldDisableBlur,
       state.activeLayerId,
-      effectiveCamera,
       state.mode,
       state.selection.selectedCell,
       state.selection.trackedCell,
@@ -770,7 +771,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       if (activeLayer) {
         drawOverlayLabels(overlayCtx, {
           layer: activeLayer,
-          camera: { ...effectiveCamera, scale: clampedScale },
+          camera: displayCamera,
           viewportSize,
           cellWidth,
           cellHeight,
@@ -796,15 +797,16 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       activeLayerVisual.zOffset,
       cellHeight,
       cellWidth,
-      clampedScale,
+      displayCamera,
       hoveredCell,
       mergedVisual,
-      mergedVisual.globalTintColor,
-      effectiveCamera,
       state.selection.selectedCell,
       state.selection.trackedCell,
       viewportSize,
     ]);
+
+    const handleExternalEventRef = useRef(handleExternalEvent);
+    handleExternalEventRef.current = handleExternalEvent;
 
     function handleExternalEvent(event: LayeredGridExternalEvent) {
       switch (event.type) {
@@ -974,7 +976,6 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       depthStackHeight,
       mergedZoom.panPaddingCells,
       onCameraChangeIntent,
-      onCameraChangeIntent,
       state.mode,
       viewportSize.height,
       viewportSize.width,
@@ -1128,9 +1129,18 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
         return;
       }
 
-      const rect = viewport.getBoundingClientRect();
-      const pointerX = args.pointerClientX - rect.left;
-      const pointerY = args.pointerClientY - rect.top;
+      const pointer = mapClientPointToViewport({
+        clientX: args.pointerClientX,
+        clientY: args.pointerClientY,
+        viewport,
+        viewportSize,
+      });
+      if (!pointer) {
+        animateCameraIntent(targetCentered, args.reason);
+        return;
+      }
+      const pointerX = pointer.x;
+      const pointerY = pointer.y;
       const clickWorldX = pointerX / startScale - from.panX;
       const clickWorldY = pointerY / startScale - from.panY;
 
@@ -1326,9 +1336,17 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       }
 
       const camera = interactionCameraRef.current;
-      const rect = viewport.getBoundingClientRect();
-      const pointerX = state.mode === "depth" ? rect.width / 2 : event.clientX - rect.left;
-      const pointerY = state.mode === "depth" ? rect.height / 2 : event.clientY - rect.top;
+      const pointer = mapClientPointToViewport({
+        clientX: event.clientX,
+        clientY: event.clientY,
+        viewport,
+        viewportSize,
+      });
+      if (!pointer) {
+        return;
+      }
+      const pointerX = state.mode === "depth" ? viewportSize.width / 2 : pointer.x;
+      const pointerY = state.mode === "depth" ? viewportSize.height / 2 : pointer.y;
 
       const currentScale = clamp(camera.scale, minScale, maxScale);
       const factor = Math.exp(-event.deltaY * 0.0018);
@@ -1455,7 +1473,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
         clientY: event.clientY,
         viewport: viewportRef.current,
         layer: activeLayer,
-        camera: interactionCameraRef.current,
+        camera: displayCamera,
         viewportSize,
         cellWidth,
         cellHeight,
@@ -1501,6 +1519,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       state.mode,
       stopMomentum,
       stopRecenteringAnimation,
+      displayCamera,
       viewportSize,
     ]);
 
@@ -1584,7 +1603,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
         clientY: event.clientY,
         viewport: viewportRef.current,
         layer: activeLayer,
-        camera: interactionCameraRef.current,
+        camera: displayCamera,
         viewportSize,
         cellWidth,
         cellHeight,
@@ -1633,6 +1652,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       onCellSelectIntent,
       startMomentum,
       state.mode,
+      displayCamera,
       viewportSize,
     ]);
 
@@ -1659,7 +1679,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
         clientY,
         viewport: viewportRef.current,
         layer: activeLayer,
-        camera: interactionCameraRef.current,
+        camera: displayCamera,
         viewportSize,
         cellWidth,
         cellHeight,
@@ -1834,7 +1854,6 @@ function drawLayer(
     blur: number;
     layerIndex: number;
     activeLayerIndex: number;
-    hoveredCell: CellRef | null;
     selectedCell: CellRef | null;
     trackedCell: CellRef | null;
     visual: LayeredGridVisualConfig;
@@ -1853,7 +1872,6 @@ function drawLayer(
     blur,
     layerIndex,
     activeLayerIndex,
-    hoveredCell,
     selectedCell,
     trackedCell,
     visual,
@@ -1882,18 +1900,13 @@ function drawLayer(
     }
 
     const cellId = resolveCellId(layer.layerId, cell);
-    const isHovered = hoveredCell?.layerId === layer.layerId && hoveredCell.cellId === cellId;
     const isSelected = selectedCell?.layerId === layer.layerId && selectedCell.cellId === cellId;
     const isTracked = trackedCell?.layerId === layer.layerId && trackedCell.cellId === cellId;
     const inkAlpha = computeLayerInkAlpha(layerIndex, activeLayerIndex, visual);
 
     ctx.lineWidth = Math.max(0.5, visual.strokeWidthAtScale1 * camera.scale);
-    ctx.strokeStyle = isSelected || isTracked
-      ? visual.selectedCellStrokeColor
-      : isHovered
-        ? "#4be3c2"
-      : visual.gridStrokeColor;
-    ctx.globalAlpha = isSelected || isTracked || isHovered ? opacity : opacity * inkAlpha;
+    ctx.strokeStyle = isSelected || isTracked ? visual.selectedCellStrokeColor : visual.gridStrokeColor;
+    ctx.globalAlpha = isSelected || isTracked ? opacity : opacity * inkAlpha;
     ctx.strokeRect(x, y, w, h);
   }
   ctx.restore();
@@ -1936,6 +1949,30 @@ function drawOverlayLabels(
     visual,
   } = args;
   ctx.save();
+
+  if (hoveredCell && hoveredCell.layerId === layer.layerId) {
+    const hoverKey = cellKey(hoveredCell.row, hoveredCell.col);
+    const hoverData = layer.cells[hoverKey];
+    if (hoverData) {
+      const hoverRect = projectCellRect({
+        row: hoverData.row,
+        col: hoverData.col,
+        camera,
+        viewportSize,
+        cellWidth,
+        cellHeight,
+        layerYOffset,
+        layerZOffset,
+        projectedScale,
+      });
+      if (hoverRect) {
+        ctx.strokeStyle = "#4be3c2";
+        ctx.lineWidth = Math.max(0.5, visual.strokeWidthAtScale1 * camera.scale);
+        ctx.globalAlpha = opacity;
+        ctx.strokeRect(hoverRect.x, hoverRect.y, hoverRect.w, hoverRect.h);
+      }
+    }
+  }
 
   const labelCells = collectLabelTargetCells({
     layer,
@@ -2045,20 +2082,24 @@ function findCellAtClientPoint(args: {
     return null;
   }
 
-  const rect = viewport.getBoundingClientRect();
-  const localX = clientX - rect.left;
-  const localY = clientY - rect.top;
-  const effectiveViewportSize: ViewportSize = {
-    width: Math.max(1, rect.width),
-    height: Math.max(1, rect.height),
-  };
+  const local = mapClientPointToViewport({
+    clientX,
+    clientY,
+    viewport,
+    viewportSize,
+  });
+  if (!local) {
+    return null;
+  }
+  const localX = local.x;
+  const localY = local.y;
 
   for (const cell of Object.values(layer.cells)) {
     const projected = projectCellRect({
       row: cell.row,
       col: cell.col,
       camera,
-      viewportSize: effectiveViewportSize,
+      viewportSize,
       cellWidth,
       cellHeight,
       layerYOffset: layerVisual.yOffset,
@@ -2086,6 +2127,28 @@ function findCellAtClientPoint(args: {
   }
 
   return null;
+}
+
+function mapClientPointToViewport(args: {
+  clientX: number;
+  clientY: number;
+  viewport: HTMLDivElement;
+  viewportSize: ViewportSize;
+}): { x: number; y: number } | null {
+  const { clientX, clientY, viewport, viewportSize } = args;
+  const rect = viewport.getBoundingClientRect();
+  const rectWidth = Math.max(1, rect.width);
+  const rectHeight = Math.max(1, rect.height);
+  if (!Number.isFinite(rectWidth) || !Number.isFinite(rectHeight)) {
+    return null;
+  }
+
+  const scaleX = viewportSize.width / rectWidth;
+  const scaleY = viewportSize.height / rectHeight;
+  return {
+    x: (clientX - rect.left) * scaleX,
+    y: (clientY - rect.top) * scaleY,
+  };
 }
 
 function projectCellRect(args: {
@@ -2327,10 +2390,6 @@ function easeInOutCubic(t: number): number {
   return t < 0.5
     ? 4 * t * t * t
     : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
-
-function easeInOutSine(t: number): number {
-  return -(Math.cos(Math.PI * t) - 1) / 2;
 }
 
 function easeOutCubic(t: number): number {
