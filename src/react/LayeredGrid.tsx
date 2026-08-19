@@ -954,12 +954,18 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
             }
 
             queuedPointerCameraRef.current = null;
+            // Preserve focusDepth from the latest committed camera so a mid-flight
+            // layer switch cannot overwrite state.camera.focusDepth.
+            const nextCamera = {
+              ...queued.camera,
+              focusDepth: committedCameraRef.current.focusDepth,
+            };
             onCameraChangeIntentRef.current({
               prevCamera: committedCameraRef.current,
-              nextCamera: queued.camera,
+              nextCamera,
               context: nowContext(queued.reason),
             });
-            committedCameraRef.current = queued.camera;
+            committedCameraRef.current = nextCamera;
           });
         }
 
@@ -1006,7 +1012,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       const recenterDurationMs = computeRecenterDurationMs({
         from,
         to: targetCamera,
-        scale: clampedScale,
+        scale: clamp(from.scale, minScale, maxScale),
         fallbackDurationMs: mergedEffects.transitionDurationMs,
       });
       recenterCameraStartTimeRef.current = performance.now() - 16.67;
@@ -1047,13 +1053,17 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
         } else {
           queuedPointerCameraRef.current = null;
           recenterPendingCommitRef.current = bounded;
+          const animateCommit = {
+            ...bounded,
+            focusDepth: committedCameraRef.current.focusDepth,
+          };
           onCameraChangeIntentRef.current({
             prevCamera: committedCameraRef.current,
-            nextCamera: bounded,
+            nextCamera: animateCommit,
             context: nowContext(reason),
           });
-          committedCameraRef.current = bounded;
-          interactionCameraRef.current = bounded;
+          committedCameraRef.current = animateCommit;
+          interactionCameraRef.current = animateCommit;
           recenterCameraStartTimeRef.current = null;
           recenterCameraFrameRef.current = null;
         }
@@ -1064,13 +1074,13 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       applyCameraIntent,
       cellHeight,
       cellWidth,
-      clampedScale,
       data.gridHeight,
       data.gridWidth,
       depthStackHeight,
       mergedEffects.transitionDurationMs,
       mergedEffects.transitionEpsilon,
       mergedZoom.panPaddingCells,
+      minScale,
       state.mode,
       stopRecenteringAnimation,
       viewportSize.height,
@@ -1229,13 +1239,17 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
 
         queuedPointerCameraRef.current = null;
         recenterPendingCommitRef.current = blended;
+        const zoomCommit = {
+          ...blended,
+          focusDepth: committedCameraRef.current.focusDepth,
+        };
         onCameraChangeIntentRef.current({
           prevCamera: committedCameraRef.current,
-          nextCamera: blended,
+          nextCamera: zoomCommit,
           context: nowContext(args.reason),
         });
-        committedCameraRef.current = blended;
-        interactionCameraRef.current = blended;
+        committedCameraRef.current = zoomCommit;
+        interactionCameraRef.current = zoomCommit;
         recenterCameraStartTimeRef.current = null;
         recenterCameraFrameRef.current = null;
       };
