@@ -89,6 +89,16 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       renderToolbarExtras,
     } = props;
 
+    // Stabilize prop callbacks via refs so they never invalidate inner useCallbacks.
+    const onCameraChangeIntentRef = useRef(onCameraChangeIntent);
+    onCameraChangeIntentRef.current = onCameraChangeIntent;
+    const onLayerChangeIntentRef = useRef(onLayerChangeIntent);
+    onLayerChangeIntentRef.current = onLayerChangeIntent;
+    const onModeChangeIntentRef = useRef(onModeChangeIntent);
+    onModeChangeIntentRef.current = onModeChangeIntent;
+    const onCellSelectIntentRef = useRef(onCellSelectIntent);
+    onCellSelectIntentRef.current = onCellSelectIntent;
+
     const viewportRef = useRef<HTMLDivElement | null>(null);
     const baseCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -450,7 +460,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
         const cellId = resolveCellId(layer.layerId, cell);
         const context = nowContext("programmatic");
 
-        onLayerChangeIntent({
+        onLayerChangeIntentRef.current({
           prevLayerId: state.activeLayerId,
           nextLayerId: request.layerId,
           context,
@@ -472,14 +482,14 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
           depthStackHeight,
         });
 
-        onCameraChangeIntent({
+        onCameraChangeIntentRef.current({
           prevCamera: state.camera,
           nextCamera: centered,
           context,
         });
 
         if (request.select !== false) {
-          onCellSelectIntent({
+          onCellSelectIntentRef.current({
             layerId: layer.layerId,
             cell: {
               layerId: layer.layerId,
@@ -500,14 +510,14 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
         const context = nowContext("programmatic");
 
         if (state.mode === "depth") {
-          onModeChangeIntent({
+          onModeChangeIntentRef.current({
             prevMode: state.mode,
             nextMode: "normal",
             context,
           });
         }
 
-        onLayerChangeIntent({
+        onLayerChangeIntentRef.current({
           prevLayerId: state.activeLayerId,
           nextLayerId: tracked.layerId,
           context,
@@ -529,27 +539,27 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
           depthStackHeight,
         });
 
-        onCameraChangeIntent({
+        onCameraChangeIntentRef.current({
           prevCamera: state.camera,
           nextCamera: centered,
           context,
         });
 
-        onCellSelectIntent({
+        onCellSelectIntentRef.current({
           layerId: tracked.layerId,
           cell: tracked,
           context,
         });
       },
       requestToggleDepthMode() {
-        onModeChangeIntent({
+        onModeChangeIntentRef.current({
           prevMode: state.mode,
           nextMode: state.mode === "depth" ? "normal" : "depth",
           context: nowContext("programmatic"),
         });
       },
       requestSetLayer(layerId: string) {
-        onLayerChangeIntent({
+        onLayerChangeIntentRef.current({
           prevLayerId: state.activeLayerId,
           nextLayerId: layerId,
           context: nowContext("programmatic"),
@@ -572,23 +582,19 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
           depthStackHeight,
         });
 
-        onCameraChangeIntent({
+        onCameraChangeIntentRef.current({
           prevCamera: state.camera,
           nextCamera: centered,
           context: nowContext("programmatic"),
         });
 
-        onLayerChangeIntent({
+        onLayerChangeIntentRef.current({
           prevLayerId: state.activeLayerId,
           nextLayerId: cell.layerId,
           context: nowContext("programmatic"),
         });
       },
     }), [
-      onCameraChangeIntent,
-      onCellSelectIntent,
-      onLayerChangeIntent,
-      onModeChangeIntent,
       state.activeLayerId,
       state.camera,
       state.mode,
@@ -810,7 +816,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
     function handleExternalEvent(event: LayeredGridExternalEvent) {
       switch (event.type) {
         case "action.layer": {
-          onLayerChangeIntent({
+          onLayerChangeIntentRef.current({
             prevLayerId: state.activeLayerId,
             nextLayerId: event.payload.layerId,
             context: {
@@ -822,7 +828,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
           break;
         }
         case "action.mode": {
-          onModeChangeIntent({
+          onModeChangeIntentRef.current({
             prevMode: state.mode,
             nextMode: event.payload.mode,
             context: {
@@ -845,7 +851,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
             break;
           }
 
-          onCellSelectIntent({
+          onCellSelectIntentRef.current({
             layerId: layer.layerId,
             cell: {
               layerId: layer.layerId,
@@ -862,7 +868,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
           break;
         }
         case "action.goto": {
-          onLayerChangeIntent({
+          onLayerChangeIntentRef.current({
             prevLayerId: state.activeLayerId,
             nextLayerId: event.payload.layerId,
             context: {
@@ -882,7 +888,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
             if (!cell) {
               break;
             }
-            onCellSelectIntent({
+            onCellSelectIntentRef.current({
               layerId: layer.layerId,
               cell: {
                 layerId: layer.layerId,
@@ -900,7 +906,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
           break;
         }
         case "action.camera": {
-          onCameraChangeIntent({
+          onCameraChangeIntentRef.current({
             prevCamera: state.camera,
             nextCamera: { ...state.camera, ...event.payload },
             context: {
@@ -948,7 +954,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
             }
 
             queuedPointerCameraRef.current = null;
-            onCameraChangeIntent({
+            onCameraChangeIntentRef.current({
               prevCamera: committedCameraRef.current,
               nextCamera: queued.camera,
               context: nowContext(queued.reason),
@@ -961,7 +967,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       }
 
       queuedPointerCameraRef.current = null;
-      onCameraChangeIntent({
+      onCameraChangeIntentRef.current({
         prevCamera: committedCameraRef.current,
         nextCamera: bounded,
         context: nowContext(reason),
@@ -974,7 +980,6 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       data.gridWidth,
       depthStackHeight,
       mergedZoom.panPaddingCells,
-      onCameraChangeIntent,
       state.mode,
       viewportSize.height,
       viewportSize.width,
@@ -1042,7 +1047,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
         } else {
           queuedPointerCameraRef.current = null;
           recenterPendingCommitRef.current = bounded;
-          onCameraChangeIntent({
+          onCameraChangeIntentRef.current({
             prevCamera: committedCameraRef.current,
             nextCamera: bounded,
             context: nowContext(reason),
@@ -1066,7 +1071,6 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       mergedEffects.transitionDurationMs,
       mergedEffects.transitionEpsilon,
       mergedZoom.panPaddingCells,
-      onCameraChangeIntent,
       state.mode,
       stopRecenteringAnimation,
       viewportSize.height,
@@ -1225,7 +1229,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
 
         queuedPointerCameraRef.current = null;
         recenterPendingCommitRef.current = blended;
-        onCameraChangeIntent({
+        onCameraChangeIntentRef.current({
           prevCamera: committedCameraRef.current,
           nextCamera: blended,
           context: nowContext(args.reason),
@@ -1249,7 +1253,6 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       mergedEffects.transitionEpsilon,
       mergedZoom.panPaddingCells,
       minScale,
-      onCameraChangeIntent,
       state.mode,
       stopRecenteringAnimation,
       viewportSize.height,
@@ -1499,7 +1502,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
         panSessionRef.current.selectedCellOnDown = hitCell;
       }
 
-      onCellSelectIntent({
+      onCellSelectIntentRef.current({
         layerId: hitCell.layerId,
         cell: hitCell,
         context: nowContext("pointer"),
@@ -1516,7 +1519,6 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       depthStackHeight,
       maxScale,
       mergedZoom.panPaddingCells,
-      onCellSelectIntent,
       state.mode,
       stopMomentum,
       stopRecenteringAnimation,
@@ -1633,7 +1635,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       animateCameraIntent(centered, "programmatic");
       lastSelectionKeyRef.current = `${hitCell.layerId}:${hitCell.cellId}`;
 
-      onCellSelectIntent({
+      onCellSelectIntentRef.current({
         layerId: hitCell.layerId,
         cell: hitCell,
         context: nowContext("pointer"),
@@ -1650,7 +1652,6 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       data.gridWidth,
       depthStackHeight,
       mergedZoom.panPaddingCells,
-      onCellSelectIntent,
       startMomentum,
       state.mode,
       displayCamera,
@@ -1707,7 +1708,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
         if (!nextLayer || nextLayer.layerId === state.activeLayerId) {
           return;
         }
-        onLayerChangeIntent({
+        onLayerChangeIntentRef.current({
           prevLayerId: state.activeLayerId,
           nextLayerId: nextLayer.layerId,
           context: nowContext("keyboard"),
@@ -1721,13 +1722,13 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
         if (!nextLayer || nextLayer.layerId === state.activeLayerId) {
           return;
         }
-        onLayerChangeIntent({
+        onLayerChangeIntentRef.current({
           prevLayerId: state.activeLayerId,
           nextLayerId: nextLayer.layerId,
           context: nowContext("keyboard"),
         });
       }
-    }, [activeLayerIndex, data.layers, onLayerChangeIntent, state.activeLayerId]);
+    }, [activeLayerIndex, data.layers, state.activeLayerId]);
 
     const viewportStyle = useMemo<CSSProperties>(
       () => ({

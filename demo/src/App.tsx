@@ -1,4 +1,4 @@
-import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LayeredGrid } from "../../src/react";
 import { cellKey, createInitialControlledState, normalizeLayeredGridData, resolveCellId } from "../../src/core";
 import type {
@@ -65,7 +65,7 @@ export function App() {
     setLogLines((prev) => [line, ...prev].slice(0, 10));
   };
 
-  const onLayerChangeIntent = (intent: LayerChangeIntent) => {
+  const onLayerChangeIntent = useCallback((intent: LayerChangeIntent) => {
     const nextLayerIndex = Math.max(0, data.layers.findIndex((layer) => layer.layerId === intent.nextLayerId));
     setState((prev) => ({
       ...prev,
@@ -76,14 +76,16 @@ export function App() {
       },
     }));
     pushLog(`layer -> ${intent.nextLayerId} (${intent.context.reason})`);
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.layers]);
 
-  const onModeChangeIntent = (intent: ModeChangeIntent) => {
+  const onModeChangeIntent = useCallback((intent: ModeChangeIntent) => {
     setState((prev) => ({ ...prev, mode: intent.nextMode }));
     pushLog(`mode -> ${intent.nextMode} (${intent.context.reason})`);
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const onCellSelectIntent = (intent: CellSelectIntent) => {
+  const onCellSelectIntent = useCallback((intent: CellSelectIntent) => {
     setState((prev) => ({
       ...prev,
       selection: {
@@ -92,11 +94,12 @@ export function App() {
       },
     }));
     pushLog(`select -> ${intent.cell.layerId}/${intent.cell.cellId}`);
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const onCameraChangeIntent = (intent: CameraChangeIntent) => {
+  const onCameraChangeIntent = useCallback((intent: CameraChangeIntent) => {
     setState((prev) => ({ ...prev, camera: intent.nextCamera }));
-  };
+  }, []);
 
   const onGridWheelCapture = () => {
     if (!isZoomInteracting) {
