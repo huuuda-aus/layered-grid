@@ -603,22 +603,31 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
 
     useEffect(() => {
       const viewport = viewportRef.current;
-      if (!viewport || typeof ResizeObserver === "undefined") {
+      if (!viewport) {
         return;
       }
 
       const update = () => {
         const rect = viewport.getBoundingClientRect();
         setViewportSize({
-          width: Math.max(1, Math.floor(rect.width)),
-          height: Math.max(1, Math.floor(rect.height)),
+          width: Math.max(1, rect.width),
+          height: Math.max(1, rect.height),
         });
       };
 
       update();
-      const observer = new ResizeObserver(() => update());
-      observer.observe(viewport);
-      return () => observer.disconnect();
+
+      if (typeof ResizeObserver !== "undefined") {
+        const observer = new ResizeObserver(() => update());
+        observer.observe(viewport);
+        return () => observer.disconnect();
+      }
+
+      const handleWindowResize = () => update();
+      window.addEventListener("resize", handleWindowResize);
+      return () => {
+        window.removeEventListener("resize", handleWindowResize);
+      };
     }, []);
 
     useEffect(() => {
@@ -1722,9 +1731,20 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       [],
     );
 
+    const hudStyle = useMemo<CSSProperties>(
+      () => ({
+        position: "absolute",
+        top: 8,
+        left: 8,
+        zIndex: 2,
+        pointerEvents: "none",
+      }),
+      [],
+    );
+
     return (
-      <section className={className} style={style}>
-        <div>
+      <section className={className} style={{ position: "relative", ...style }}>
+        <div style={hudStyle}>
           <div>Active cell: {state.selection.trackedCell ? `${state.selection.trackedCell.layerId}-${state.selection.trackedCell.cellId}` : "-"}</div>
           {renderToolbarExtras ? renderToolbarExtras(state) : null}
         </div>
