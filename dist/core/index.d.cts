@@ -1,5 +1,5 @@
-import { L as LayeredGridCell, a as LayeredGridMode, C as CameraState, b as LayeredGridData, c as LayeredGridControlledState } from '../types-AbvTUJEF.cjs';
-export { A as ActionCameraEvent, d as ActionGotoEvent, e as ActionLayerEvent, f as ActionModeEvent, g as ActionSelectEvent, h as CameraChangeIntent, i as CellAsset, j as CellAssetKind, k as CellCoord, l as CellRef, m as CellSelectIntent, D as DrawOverlayCell, n as DrawOverlayEvent, o as LayerChangeIntent, p as LayeredGridExternalEvent, q as LayeredGridGeometry, r as LayeredGridIntentContext, s as LayeredGridLayer, t as LayeredGridSelectionState, u as LayeredGridVersion, v as LayeredGridVisualConfig, w as LayeredGridZoomConfig, M as ModeChangeIntent } from '../types-AbvTUJEF.cjs';
+import { L as LayeredGridCell, a as LayeredGridMode, C as CameraState, b as LayeredGridData, c as LayeredGridControlledState, d as LayeredGridEffectsConfig, e as LayeredGridVisualConfig } from '../types-BZ-lL9W2.cjs';
+export { A as ActionCameraEvent, f as ActionGotoEvent, g as ActionLayerEvent, h as ActionModeEvent, i as ActionSelectEvent, j as CameraChangeIntent, k as CellAsset, l as CellAssetKind, m as CellCoord, n as CellRef, o as CellSelectIntent, D as DrawOverlayCell, p as DrawOverlayEvent, q as LayerChangeIntent, r as LayeredGridExternalEvent, s as LayeredGridGeometry, t as LayeredGridIntentContext, u as LayeredGridLayer, v as LayeredGridSelectionState, w as LayeredGridVersion, x as LayeredGridZoomConfig, M as ModeChangeIntent } from '../types-BZ-lL9W2.cjs';
 
 declare function cellKey(row: number, col: number): string;
 declare function generateCellId(layerId: string, row: number, col: number): string;
@@ -19,4 +19,9 @@ declare function normalizeLayeredGridData(input: LayeredGridData, options?: Norm
 declare function createInitialControlledState(data: LayeredGridData, options?: InitialControlledStateOptions): LayeredGridControlledState;
 declare function findCellInLayer(data: LayeredGridData, layerId: string, row: number, col: number): LayeredGridCell | null;
 
-export { CameraState, type InitialControlledStateOptions, LayeredGridCell, LayeredGridControlledState, LayeredGridData, LayeredGridMode, type NormalizeGridOptions, cellKey, createInitialControlledState, findCellInLayer, generateCellId, normalizeLayeredGridData, resolveCellId, resolveCellVisualId };
+declare const DEFAULT_LAYERED_GRID_VISUAL_CONFIG: LayeredGridVisualConfig;
+declare const DEFAULT_LAYERED_GRID_EFFECTS_CONFIG: LayeredGridEffectsConfig;
+declare function resolveLayeredGridVisualConfig(visual?: Partial<LayeredGridVisualConfig>): LayeredGridVisualConfig;
+declare function resolveLayeredGridEffectsConfig(effects?: Partial<LayeredGridEffectsConfig>): LayeredGridEffectsConfig;
+
+export { CameraState, DEFAULT_LAYERED_GRID_EFFECTS_CONFIG, DEFAULT_LAYERED_GRID_VISUAL_CONFIG, type InitialControlledStateOptions, LayeredGridCell, LayeredGridControlledState, LayeredGridData, LayeredGridEffectsConfig, LayeredGridMode, LayeredGridVisualConfig, type NormalizeGridOptions, cellKey, createInitialControlledState, findCellInLayer, generateCellId, normalizeLayeredGridData, resolveCellId, resolveCellVisualId, resolveLayeredGridEffectsConfig, resolveLayeredGridVisualConfig };

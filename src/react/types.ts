@@ -47,6 +47,14 @@ export type LayeredGridRendererProps = {
   onCellSelectIntent: (intent: CellSelectIntent) => void;
   onCameraChangeIntent: (intent: CameraChangeIntent) => void;
 
+  // When true, disables every camera-moving interaction (wheel zoom, drag
+  // pan, arrow-key pan, click-to-recenter/zoom, and the auto-recenter that
+  // normally follows selection changes). Cell selection and layer switching
+  // (tabs, PageUp/PageDown) still work — only the camera itself is frozen at
+  // whatever `state.camera` holds. Intended for a fixed, fully-visible board
+  // view where there is nothing to pan or zoom to.
+  lockCamera?: boolean;
+
   renderCellOverlay?: (params: CellRenderParams) => React.ReactNode;
   renderLayerOverlay?: (layerId: string) => React.ReactNode;
   renderToolbarExtras?: (state: LayeredGridControlledState) => React.ReactNode;

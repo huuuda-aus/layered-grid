@@ -47,6 +47,9 @@ const DEFAULT_ZOOM: LayeredGridZoomConfig = {
 };
 
 const DRAG_THRESHOLD_PX = 3;
+const DOUBLE_CLICK_MS = 350;
+const DOUBLE_CLICK_PX = 12;
+const ARROW_PAN_DURATION_MS = 200;
 const RECENTER_MIN_DURATION_MS = 180;
 const RECENTER_MAX_DURATION_MS = 300;
 const RECENTER_END_SNAP_PROGRESS = 0.88;
@@ -84,6 +87,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       onModeChangeIntent,
       onCellSelectIntent,
       onCameraChangeIntent,
+      lockCamera = false,
       renderCellOverlay,
       renderLayerOverlay,
       renderToolbarExtras,
@@ -109,6 +113,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       modeBlend: state.mode === "depth" ? 1 : 0,
     }));
     const [hoveredCell, setHoveredCell] = useState<CellRef | null>(null);
+    const lastPointerClientPosRef = useRef<{ x: number; y: number } | null>(null);
     const [isPointerInteractionActive, setIsPointerInteractionActive] = useState(false);
     const [isMomentumActive, setIsMomentumActive] = useState(false);
     const [cameraTweenFrame, setCameraTweenFrame] = useState<CameraState | null>(null);
@@ -125,7 +130,9 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       velocityY: number;
       moved: boolean;
       selectedCellOnDown: CellRef | null;
+      isDoubleClick: boolean;
     } | null>(null);
+    const lastPointerDownInfoRef = useRef<{ time: number; x: number; y: number } | null>(null);
     const processedExternalEventKeysRef = useRef<Set<string>>(new Set());
     const transitionFrameRef = useRef<number | null>(null);
     const animatedViewRef = useRef<AnimatedView>(animatedView);
@@ -720,7 +727,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
           opacity: visual.opacity,
           blur: shouldDisableBlur ? 0 : visual.blur,
           layerIndex,
-          activeLayerIndex,
+          focusDepth: animatedView.focusDepth,
           selectedCell: state.selection.selectedCell,
           trackedCell: state.selection.trackedCell,
           visual: mergedVisual,
@@ -1274,6 +1281,10 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
     ]);
 
     useEffect(() => {
+      if (lockCamera) {
+        return;
+      }
+
       const anchor = state.selection.selectedCell ?? state.selection.trackedCell;
       const selectionKey = anchor ? `${anchor.layerId}:${anchor.cellId}` : null;
 
@@ -1334,6 +1345,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       data.gridWidth,
       depthStackHeight,
       isPointerInteractionActive,
+      lockCamera,
       maxScale,
       mergedZoom.panPaddingCells,
       state.activeLayerId,
@@ -1346,6 +1358,11 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
 
     const onWheel = useCallback((event: WheelEvent) => {
       event.preventDefault();
+
+      if (lockCamera) {
+        return;
+      }
+
       stopRecenteringAnimation();
 
       const viewport = viewportRef.current;
@@ -1425,6 +1442,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       data.gridHeight,
       data.gridWidth,
       depthStackHeight,
+      lockCamera,
       maxScale,
       mergedZoom.panPaddingCells,
       minScale,
@@ -1467,6 +1485,18 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       setIsPointerInteractionActive(true);
       const camera = interactionCameraRef.current;
       const now = performance.now();
+
+      // A rapid second click near the same spot is treated as a double-click,
+      // which is reserved for panning (drag-to-pan) rather than selection —
+      // needed on devices without a middle-mouse/wheel-drag pan gesture.
+      const lastDown = lastPointerDownInfoRef.current;
+      const isDoubleClick =
+        event.button === 0 &&
+        !!lastDown &&
+        now - lastDown.time <= DOUBLE_CLICK_MS &&
+        Math.hypot(event.clientX - lastDown.x, event.clientY - lastDown.y) <= DOUBLE_CLICK_PX;
+      lastPointerDownInfoRef.current = { time: now, x: event.clientX, y: event.clientY };
+
       panSessionRef.current = {
         pointerId: event.pointerId,
         startX: event.clientX,
@@ -1480,9 +1510,10 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
         velocityY: 0,
         moved: false,
         selectedCellOnDown: null,
+        isDoubleClick,
       };
 
-      if (event.button !== 0 || state.mode === "depth") {
+      if (event.button !== 0 || state.mode === "depth" || isDoubleClick) {
         return;
       }
 
@@ -1502,13 +1533,15 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
         return;
       }
 
-      animateSelectionZoomFromPointer({
-        row: hitCell.row,
-        col: hitCell.col,
-        pointerClientX: event.clientX,
-        pointerClientY: event.clientY,
-        reason: "pointer",
-      });
+      if (!lockCamera) {
+        animateSelectionZoomFromPointer({
+          row: hitCell.row,
+          col: hitCell.col,
+          pointerClientX: event.clientX,
+          pointerClientY: event.clientY,
+          reason: "pointer",
+        });
+      }
       const selectedKey = `${hitCell.layerId}:${hitCell.cellId}`;
       lastSelectionKeyRef.current = selectedKey;
       suppressSelectionRecenterKeyRef.current = selectedKey;
@@ -1531,6 +1564,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       data.gridHeight,
       data.gridWidth,
       depthStackHeight,
+      lockCamera,
       maxScale,
       mergedZoom.panPaddingCells,
       state.mode,
@@ -1541,6 +1575,11 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
     ]);
 
     const onPointerMove = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
+      if (lockCamera) {
+        updateHoveredCellFromPointer(event.clientX, event.clientY);
+        return;
+      }
+
       const session = panSessionRef.current;
       if (!session || session.pointerId !== event.pointerId) {
         updateHoveredCellFromPointer(event.clientX, event.clientY);
@@ -1589,7 +1628,26 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
         "pointer",
       );
       setHoveredCell(null);
-    }, [applyCameraIntent, clampedScale, state.mode, stopRecenteringAnimation]);
+      // Note: updateHoveredCellFromPointer (called above in every early-return
+      // branch) closes over activeLayer/displayCamera/activeLayerVisual/
+      // cellWidth/cellHeight/viewportSize — all listed below even though this
+      // function body doesn't reference them directly, otherwise this
+      // callback goes stale (frozen at whichever layer was active when it was
+      // last actually recreated) the moment none of the other deps change,
+      // which is exactly what happens once panning is locked.
+    }, [
+      activeLayer,
+      activeLayerVisual,
+      applyCameraIntent,
+      cellHeight,
+      cellWidth,
+      clampedScale,
+      displayCamera,
+      lockCamera,
+      state.mode,
+      stopRecenteringAnimation,
+      viewportSize,
+    ]);
 
     const onPointerUp = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
       const session = panSessionRef.current;
@@ -1603,6 +1661,10 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       if (session.moved) {
         setHoveredCell(null);
         startMomentum(session.velocityX, session.velocityY);
+        return;
+      }
+
+      if (session.isDoubleClick) {
         return;
       }
 
@@ -1630,23 +1692,25 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
         return;
       }
 
-      const centered = centerCameraOnCell({
-        row: hitCell.row,
-        col: hitCell.col,
-        current: interactionCameraRef.current,
-        scale: maxScale,
-        viewportWidth: viewportSize.width,
-        viewportHeight: viewportSize.height,
-        cellWidth,
-        cellHeight,
-        gridWidth: data.gridWidth,
-        gridHeight: data.gridHeight,
-        mode: state.mode,
-        panPaddingCells: mergedZoom.panPaddingCells,
-        depthStackHeight,
-      });
+      if (!lockCamera) {
+        const centered = centerCameraOnCell({
+          row: hitCell.row,
+          col: hitCell.col,
+          current: interactionCameraRef.current,
+          scale: maxScale,
+          viewportWidth: viewportSize.width,
+          viewportHeight: viewportSize.height,
+          cellWidth,
+          cellHeight,
+          gridWidth: data.gridWidth,
+          gridHeight: data.gridHeight,
+          mode: state.mode,
+          panPaddingCells: mergedZoom.panPaddingCells,
+          depthStackHeight,
+        });
 
-      animateCameraIntent(centered, "programmatic");
+        animateCameraIntent(centered, "programmatic");
+      }
       lastSelectionKeyRef.current = `${hitCell.layerId}:${hitCell.cellId}`;
 
       onCellSelectIntentRef.current({
@@ -1665,6 +1729,7 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       data.gridHeight,
       data.gridWidth,
       depthStackHeight,
+      lockCamera,
       mergedZoom.panPaddingCells,
       startMomentum,
       state.mode,
@@ -1676,15 +1741,19 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       panSessionRef.current = null;
       setIsPointerInteractionActive(false);
       setHoveredCell(null);
+      lastPointerClientPosRef.current = null;
     }, []);
 
     const onPointerCancel = useCallback(() => {
       panSessionRef.current = null;
       setIsPointerInteractionActive(false);
       setHoveredCell(null);
+      lastPointerClientPosRef.current = null;
     }, []);
 
     function updateHoveredCellFromPointer(clientX: number, clientY: number) {
+      lastPointerClientPosRef.current = { x: clientX, y: clientY };
+
       if (state.mode === "depth") {
         setHoveredCell(null);
         return;
@@ -1714,6 +1783,27 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       });
     }
 
+    // Hover is normally recomputed on pointermove, but any non-pointer camera
+    // move (keyboard pan, wheel zoom, programmatic recenter) shifts the grid
+    // under a stationary cursor — without this, the hovered cell stays stuck
+    // at its pre-pan position while its on-screen location moves, so the
+    // highlighted cell drifts away from the actual cursor. Re-run the same
+    // hit test against the last known pointer position once the move settles.
+    // Deliberately keyed off the *committed* control state (state.camera),
+    // not the per-frame animated displayCamera/activeLayerVisual — those tick
+    // on every animation frame (pan tween, layer-switch transition) and
+    // recomputing hover that often stacks a hit-test + setState on top of the
+    // canvas redraw every frame, which is what was causing the pan animation
+    // itself to visibly stutter.
+    useEffect(() => {
+      const pos = lastPointerClientPosRef.current;
+      if (!pos || isPointerInteractionActive) {
+        return;
+      }
+      updateHoveredCellFromPointer(pos.x, pos.y);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [state.camera, state.activeLayerId, state.mode]);
+
     const onKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
       if (event.code === "PageDown") {
         event.preventDefault();
@@ -1742,7 +1832,99 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
           context: nowContext("keyboard"),
         });
       }
-    }, [activeLayerIndex, data.layers, state.activeLayerId]);
+
+      // Arrow-key panning — the primary pan gesture for pointer/touch devices
+      // without a middle-mouse/wheel-drag pan gesture. Disabled in depth mode,
+      // matching drag-pan's own behavior there (horizontal pan is a no-op and
+      // layer navigation already owns PageUp/PageDown in that mode).
+      //
+      // This deliberately does NOT interpolate camera state frame-by-frame
+      // (that re-renders and redraws both canvases ~12 times over 200ms,
+      // which is heavy with the CRT filter active and reads as choppy). The
+      // real camera state jumps straight to its final value in one redraw;
+      // the motion is faked with a CSS transform on the viewport element
+      // rewound by the pixel delta and then transitioned back to identity —
+      // that's a compositor-only animation, no JS or canvas work per frame.
+      // Hover intentionally goes stale for the duration of the transition
+      // (it resolves once the transform settles via the effect above).
+      if (
+        !lockCamera &&
+        state.mode !== "depth" &&
+        (event.code === "ArrowUp" ||
+          event.code === "ArrowDown" ||
+          event.code === "ArrowLeft" ||
+          event.code === "ArrowRight")
+      ) {
+        event.preventDefault();
+        stopMomentum();
+        stopRecenteringAnimation();
+
+        const el = viewportRef.current;
+        if (el) {
+          // Cancel any in-flight rewind so repeated key presses don't stack
+          // transforms — each press starts from a fresh, settled baseline.
+          el.style.transition = "none";
+          el.style.transform = "none";
+        }
+
+        const camera = interactionCameraRef.current;
+        const dPanX = event.code === "ArrowLeft" ? cellWidth : event.code === "ArrowRight" ? -cellWidth : 0;
+        const dPanY = event.code === "ArrowUp" ? cellHeight : event.code === "ArrowDown" ? -cellHeight : 0;
+
+        const target = clampCameraToBounds({
+          camera: { ...camera, panX: camera.panX + dPanX, panY: camera.panY + dPanY },
+          viewportWidth: viewportSize.width,
+          viewportHeight: viewportSize.height,
+          gridWidth: data.gridWidth,
+          gridHeight: data.gridHeight,
+          cellWidth,
+          cellHeight,
+          mode: state.mode,
+          panPaddingCells: mergedZoom.panPaddingCells,
+          depthStackHeight,
+        });
+
+        const screenDX = (target.panX - camera.panX) * camera.scale;
+        const screenDY = (target.panY - camera.panY) * camera.scale;
+
+        interactionCameraRef.current = target;
+        committedCameraRef.current = target;
+        onCameraChangeIntentRef.current({
+          prevCamera: camera,
+          nextCamera: target,
+          context: nowContext("keyboard"),
+        });
+
+        if (el && (screenDX !== 0 || screenDY !== 0)) {
+          el.style.transform = `translate(${-screenDX}px, ${-screenDY}px)`;
+          // Force a reflow so the rewound position is actually applied
+          // before the transition below kicks in — otherwise the browser
+          // may coalesce both style writes into a single frame and skip
+          // straight to the end state with no visible animation.
+          void el.offsetHeight;
+          requestAnimationFrame(() => {
+            el.style.transition = `transform ${ARROW_PAN_DURATION_MS}ms linear`;
+            el.style.transform = "translate(0px, 0px)";
+          });
+        }
+      }
+    }, [
+      activeLayerIndex,
+      cellHeight,
+      cellWidth,
+      data.gridHeight,
+      data.gridWidth,
+      data.layers,
+      depthStackHeight,
+      lockCamera,
+      mergedZoom.panPaddingCells,
+      state.activeLayerId,
+      state.mode,
+      stopMomentum,
+      stopRecenteringAnimation,
+      viewportSize.height,
+      viewportSize.width,
+    ]);
 
     const viewportStyle = useMemo<CSSProperties>(
       () => ({
@@ -1869,7 +2051,7 @@ function drawLayer(
     opacity: number;
     blur: number;
     layerIndex: number;
-    activeLayerIndex: number;
+    focusDepth: number;
     selectedCell: CellRef | null;
     trackedCell: CellRef | null;
     visual: LayeredGridVisualConfig;
@@ -1887,7 +2069,7 @@ function drawLayer(
     opacity,
     blur,
     layerIndex,
-    activeLayerIndex,
+    focusDepth,
     selectedCell,
     trackedCell,
     visual,
@@ -1918,7 +2100,7 @@ function drawLayer(
     const cellId = resolveCellId(layer.layerId, cell);
     const isSelected = selectedCell?.layerId === layer.layerId && selectedCell.cellId === cellId;
     const isTracked = trackedCell?.layerId === layer.layerId && trackedCell.cellId === cellId;
-    const inkAlpha = computeLayerInkAlpha(layerIndex, activeLayerIndex, visual);
+    const inkAlpha = computeLayerInkAlpha(layerIndex, focusDepth, visual);
 
     ctx.lineWidth = Math.max(0.5, visual.strokeWidthAtScale1 * camera.scale);
     ctx.strokeStyle = isSelected || isTracked ? visual.selectedCellStrokeColor : visual.gridStrokeColor;
@@ -2258,8 +2440,12 @@ function computeNormalDepthVisual(
   const behind = Math.abs(distance);
 
   if (behind <= 1) {
+    // Linear, not eased — an ease-in curve here keeps the outgoing layer
+    // near-full opacity for most of the transition then drops it almost
+    // entirely in the final stretch, which reads as an abrupt disappearance
+    // rather than a fade.
     return {
-      opacity: clamp(1 - (1 - previousLayerOpacity) * easeInCubic(behind), 0, 1),
+      opacity: clamp(1 - (1 - previousLayerOpacity) * behind, 0, 1),
       blur: lerp(0, 2.4, behind),
     };
   }
@@ -2398,10 +2584,6 @@ function clampCameraToBounds(args: {
   };
 }
 
-function easeInCubic(t: number): number {
-  return t * t * t;
-}
-
 function easeInOutCubic(t: number): number {
   return t < 0.5
     ? 4 * t * t * t
@@ -2448,25 +2630,28 @@ function computePerspectiveScale(zOffset: number, cameraPerspective: number): nu
 
 function computeLayerInkAlpha(
   layerIndex: number,
-  activeLayerIndex: number,
+  focusDepth: number,
   visual: LayeredGridVisualConfig,
 ): number {
   const base = visual.activeLayerInkAlpha;
-  if (activeLayerIndex < 0) {
+  if (focusDepth < 0) {
     return clamp(base, visual.minimumInkAlpha, 1);
   }
 
-  if (layerIndex <= activeLayerIndex) {
-    return clamp(
-      layerIndex === activeLayerIndex ? base : visual.aboveLayerInkAlpha,
-      visual.minimumInkAlpha,
-      1,
-    );
+  // Driven by the continuous, animated focus depth (not the discrete active
+  // layer index) so ink alpha fades in step with the layer-switch transition
+  // instead of snapping the instant the active layer changes — otherwise a
+  // bright active-layer alpha (e.g. 1) visibly jump-cuts to the dim
+  // above/below value before any fade has a chance to play.
+  const distance = layerIndex - focusDepth;
+
+  if (distance <= 0) {
+    const t = clamp(Math.abs(distance), 0, 1);
+    return clamp(lerp(base, visual.aboveLayerInkAlpha, t), visual.minimumInkAlpha, 1);
   }
 
-  const depthBelow = layerIndex - activeLayerIndex;
   return clamp(
-    base * Math.pow(visual.belowLayerInkDecayFactor, depthBelow),
+    base * Math.pow(visual.belowLayerInkDecayFactor, distance),
     visual.minimumInkAlpha,
     1,
   );

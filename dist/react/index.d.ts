@@ -1,6 +1,6 @@
 import * as React from 'react';
 import React__default from 'react';
-import { b as LayeredGridData, c as LayeredGridControlledState, q as LayeredGridGeometry, w as LayeredGridZoomConfig, v as LayeredGridVisualConfig, p as LayeredGridExternalEvent, o as LayerChangeIntent, M as ModeChangeIntent, m as CellSelectIntent, h as CameraChangeIntent, l as CellRef } from '../types-AbvTUJEF.js';
+import { b as LayeredGridData, c as LayeredGridControlledState, s as LayeredGridGeometry, x as LayeredGridZoomConfig, e as LayeredGridVisualConfig, d as LayeredGridEffectsConfig, r as LayeredGridExternalEvent, q as LayerChangeIntent, M as ModeChangeIntent, o as CellSelectIntent, j as CameraChangeIntent, n as CellRef } from '../types-BZ-lL9W2.js';
 
 type LayeredGridExternalEventSource = {
     subscribe: (listener: (event: LayeredGridExternalEvent) => void) => () => void;
@@ -22,12 +22,14 @@ type LayeredGridRendererProps = {
     geometry?: Partial<LayeredGridGeometry>;
     zoom?: Partial<LayeredGridZoomConfig>;
     visual?: Partial<LayeredGridVisualConfig>;
+    effects?: Partial<LayeredGridEffectsConfig>;
     externalEventSource?: LayeredGridExternalEventSource;
     externalEvents?: LayeredGridExternalEvent[];
     onLayerChangeIntent: (intent: LayerChangeIntent) => void;
     onModeChangeIntent: (intent: ModeChangeIntent) => void;
     onCellSelectIntent: (intent: CellSelectIntent) => void;
     onCameraChangeIntent: (intent: CameraChangeIntent) => void;
+    lockCamera?: boolean;
     renderCellOverlay?: (params: CellRenderParams) => React__default.ReactNode;
     renderLayerOverlay?: (layerId: string) => React__default.ReactNode;
     renderToolbarExtras?: (state: LayeredGridControlledState) => React__default.ReactNode;

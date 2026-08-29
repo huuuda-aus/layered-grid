@@ -101,6 +101,45 @@ function normalizeLayer(layer, args) {
   };
 }
 
-export { cellKey, createInitialControlledState, findCellInLayer, generateCellId, normalizeLayeredGridData, resolveCellId, resolveCellVisualId };
+// src/core/config.ts
+var DEFAULT_LAYERED_GRID_VISUAL_CONFIG = {
+  backgroundColor: "#262626",
+  globalTintColor: "transparent",
+  gridStrokeColor: "#ffffff",
+  labelColor: "#ffffff",
+  selectedCellStrokeColor: "#ffd400",
+  activeLayerInkAlpha: 0.2,
+  belowLayerInkDecayFactor: 0.5,
+  aboveLayerInkAlpha: 0.2,
+  minimumInkAlpha: 0.01,
+  strokeWidthAtScale1: 1,
+  labelFontPxAtScale1: 12,
+  labelFontFamily: "sans-serif"
+};
+var DEFAULT_LAYERED_GRID_EFFECTS_CONFIG = {
+  deeperLayerOpacityFalloff: 0.35,
+  previousLayerOpacity: 0.1,
+  farLayerVisibilityCutoff: 0.02,
+  normalModeLayerZStep: 480,
+  cameraPerspective: 1100,
+  transitionDurationMs: 350,
+  transitionEpsilon: 1e-3,
+  transitionFocusLerp: 0.2,
+  transitionModeLerp: 0.18
+};
+function resolveLayeredGridVisualConfig(visual) {
+  return {
+    ...DEFAULT_LAYERED_GRID_VISUAL_CONFIG,
+    ...visual
+  };
+}
+function resolveLayeredGridEffectsConfig(effects) {
+  return {
+    ...DEFAULT_LAYERED_GRID_EFFECTS_CONFIG,
+    ...effects
+  };
+}
+
+export { DEFAULT_LAYERED_GRID_EFFECTS_CONFIG, DEFAULT_LAYERED_GRID_VISUAL_CONFIG, cellKey, createInitialControlledState, findCellInLayer, generateCellId, normalizeLayeredGridData, resolveCellId, resolveCellVisualId, resolveLayeredGridEffectsConfig, resolveLayeredGridVisualConfig };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

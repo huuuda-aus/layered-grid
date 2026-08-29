@@ -67,9 +67,29 @@ type LayeredGridZoomConfig = {
     panPaddingCells: number;
 };
 type LayeredGridVisualConfig = {
+    backgroundColor: string;
+    globalTintColor: string;
+    gridStrokeColor: string;
+    labelColor: string;
+    selectedCellStrokeColor: string;
+    activeLayerInkAlpha: number;
+    belowLayerInkDecayFactor: number;
+    aboveLayerInkAlpha: number;
+    minimumInkAlpha: number;
+    strokeWidthAtScale1: number;
+    labelFontPxAtScale1: number;
+    labelFontFamily: string;
+};
+type LayeredGridEffectsConfig = {
     deeperLayerOpacityFalloff: number;
     previousLayerOpacity: number;
     farLayerVisibilityCutoff: number;
+    normalModeLayerZStep: number;
+    cameraPerspective: number;
+    transitionDurationMs: number;
+    transitionEpsilon: number;
+    transitionFocusLerp: number;
+    transitionModeLerp: number;
 };
 type LayeredGridSelectionState = {
     trackedCell: CellRef | null;
@@ -168,4 +188,4 @@ type ActionCameraEvent = {
 };
 type LayeredGridExternalEvent = DrawOverlayEvent | ActionSelectEvent | ActionGotoEvent | ActionLayerEvent | ActionModeEvent | ActionCameraEvent;
 
-export type { ActionCameraEvent as A, CameraState as C, DrawOverlayCell as D, LayeredGridCell as L, ModeChangeIntent as M, LayeredGridMode as a, LayeredGridData as b, LayeredGridControlledState as c, ActionGotoEvent as d, ActionLayerEvent as e, ActionModeEvent as f, ActionSelectEvent as g, CameraChangeIntent as h, CellAsset as i, CellAssetKind as j, CellCoord as k, CellRef as l, CellSelectIntent as m, DrawOverlayEvent as n, LayerChangeIntent as o, LayeredGridExternalEvent as p, LayeredGridGeometry as q, LayeredGridIntentContext as r, LayeredGridLayer as s, LayeredGridSelectionState as t, LayeredGridVersion as u, LayeredGridVisualConfig as v, LayeredGridZoomConfig as w };
+export type { ActionCameraEvent as A, CameraState as C, DrawOverlayCell as D, LayeredGridCell as L, ModeChangeIntent as M, LayeredGridMode as a, LayeredGridData as b, LayeredGridControlledState as c, LayeredGridEffectsConfig as d, LayeredGridVisualConfig as e, ActionGotoEvent as f, ActionLayerEvent as g, ActionModeEvent as h, ActionSelectEvent as i, CameraChangeIntent as j, CellAsset as k, CellAssetKind as l, CellCoord as m, CellRef as n, CellSelectIntent as o, DrawOverlayEvent as p, LayerChangeIntent as q, LayeredGridExternalEvent as r, LayeredGridGeometry as s, LayeredGridIntentContext as t, LayeredGridLayer as u, LayeredGridSelectionState as v, LayeredGridVersion as w, LayeredGridZoomConfig as x };
