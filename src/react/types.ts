@@ -30,6 +30,20 @@ export type CellRenderParams = {
   isHovered: boolean;
 };
 
+// The same yOffset/zOffset/projectedScale/opacity math driving how a layer
+// itself is drawn (including the live tween mid-transition), keyed by
+// layerId. Lets a consumer project a point on *any* layer — not just the
+// active one — into the same screen space renderCellOverlay's wrapper uses,
+// so e.g. a marker anchored to a layer you aren't currently looking at can
+// still track that layer's true on-screen position, smoothly, through a
+// layer-switch transition instead of only snapping at either end of it.
+export type LayerVisual = {
+  yOffset: number;
+  zOffset: number;
+  projectedScale: number;
+  opacity: number;
+};
+
 export type LayeredGridRendererProps = {
   data: LayeredGridData;
   state: LayeredGridControlledState;
@@ -58,6 +72,13 @@ export type LayeredGridRendererProps = {
   renderCellOverlay?: (params: CellRenderParams) => React.ReactNode;
   renderLayerOverlay?: (layerId: string) => React.ReactNode;
   renderToolbarExtras?: (state: LayeredGridControlledState) => React.ReactNode;
+
+  // Fired whenever any layer's visual transform changes — including every
+  // frame of the ~350ms layer-switch transition tween, not just at rest.
+  // Only wire this up if you need to project a point on a non-active layer
+  // into screen space outside of renderCellOverlay's own wrapper (e.g. an
+  // external SVG overlay); it re-renders the consumer that often.
+  onLayerVisualsChange?: (visuals: Record<string, LayerVisual>) => void;
 
   className?: string;
   style?: React.CSSProperties;

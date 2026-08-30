@@ -104,10 +104,13 @@ var LayeredGrid = forwardRef(
       lockCamera = false,
       renderCellOverlay,
       renderLayerOverlay,
-      renderToolbarExtras
+      renderToolbarExtras,
+      onLayerVisualsChange
     } = props;
     const onCameraChangeIntentRef = useRef(onCameraChangeIntent);
     onCameraChangeIntentRef.current = onCameraChangeIntent;
+    const onLayerVisualsChangeRef = useRef(onLayerVisualsChange);
+    onLayerVisualsChangeRef.current = onLayerVisualsChange;
     const onLayerChangeIntentRef = useRef(onLayerChangeIntent);
     onLayerChangeIntentRef.current = onLayerChangeIntent;
     const onModeChangeIntentRef = useRef(onModeChangeIntent);
@@ -277,24 +280,35 @@ var LayeredGrid = forwardRef(
       [data.layers.length, mergedGeometry.depthLayerDistance, mergedGeometry.normalLayerDistance]
     );
     const overlayCells = useMemo(() => {
-      if (!renderCellOverlay || !activeLayer) {
+      if (!renderCellOverlay) {
         return [];
       }
-      return Object.values(activeLayer.cells).map((cell) => {
-        const cellId = resolveCellId(activeLayer.layerId, cell);
-        return {
-          layerId: activeLayer.layerId,
-          row: cell.row,
-          col: cell.col,
-          cellId,
-          visualId: resolveCellVisualId(cell),
-          isActiveLayer: true,
-          isSelected: state.selection.selectedCell?.layerId === activeLayer.layerId && state.selection.selectedCell.cellId === cellId,
-          isTracked: state.selection.trackedCell?.layerId === activeLayer.layerId && state.selection.trackedCell.cellId === cellId,
-          isHovered: hoveredCell?.layerId === activeLayer.layerId && hoveredCell.cellId === cellId
-        };
-      });
-    }, [activeLayer, hoveredCell, state.selection.selectedCell, state.selection.trackedCell]);
+      const cells = [];
+      for (const layer of data.layers) {
+        for (const cell of Object.values(layer.cells)) {
+          const cellId = resolveCellId(layer.layerId, cell);
+          cells.push({
+            layerId: layer.layerId,
+            row: cell.row,
+            col: cell.col,
+            cellId,
+            visualId: resolveCellVisualId(cell),
+            isActiveLayer: layer.layerId === state.activeLayerId,
+            isSelected: state.selection.selectedCell?.layerId === layer.layerId && state.selection.selectedCell.cellId === cellId,
+            isTracked: state.selection.trackedCell?.layerId === layer.layerId && state.selection.trackedCell.cellId === cellId,
+            isHovered: hoveredCell?.layerId === layer.layerId && hoveredCell.cellId === cellId
+          });
+        }
+      }
+      return cells;
+    }, [
+      data.layers,
+      state.activeLayerId,
+      hoveredCell,
+      state.selection.selectedCell,
+      state.selection.trackedCell,
+      renderCellOverlay
+    ]);
     const activeLayerVisual = useMemo(() => {
       if (activeLayerIndex < 0) {
         return {
@@ -327,6 +341,46 @@ var LayeredGrid = forwardRef(
       mergedGeometry.depthLayerDistance,
       mergedGeometry.normalLayerDistance
     ]);
+    const layerVisualById = useMemo(() => {
+      const map = /* @__PURE__ */ new Map();
+      data.layers.forEach((layer, layerIndex) => {
+        map.set(
+          layer.layerId,
+          resolveLayerVisual({
+            layerIndex,
+            focusDepth: animatedView.focusDepth,
+            modeBlend: animatedView.modeBlend,
+            depthLayerDistance: mergedGeometry.depthLayerDistance,
+            normalLayerDistance: mergedGeometry.normalLayerDistance,
+            deeperLayerOpacityFalloff: mergedEffects.deeperLayerOpacityFalloff,
+            previousLayerOpacity: mergedEffects.previousLayerOpacity,
+            normalModeLayerZStep: mergedEffects.normalModeLayerZStep,
+            cameraPerspective: mergedEffects.cameraPerspective
+          })
+        );
+      });
+      return map;
+    }, [
+      data.layers,
+      animatedView.focusDepth,
+      animatedView.modeBlend,
+      mergedEffects.cameraPerspective,
+      mergedEffects.deeperLayerOpacityFalloff,
+      mergedEffects.normalModeLayerZStep,
+      mergedEffects.previousLayerOpacity,
+      mergedGeometry.depthLayerDistance,
+      mergedGeometry.normalLayerDistance
+    ]);
+    useEffect(() => {
+      if (!onLayerVisualsChangeRef.current) {
+        return;
+      }
+      const visuals = {};
+      layerVisualById.forEach((visual2, layerId) => {
+        visuals[layerId] = visual2;
+      });
+      onLayerVisualsChangeRef.current(visuals);
+    }, [layerVisualById]);
     useEffect(() => {
       if (transitionFrameRef.current !== null) {
         cancelAnimationFrame(transitionFrameRef.current);
@@ -1678,16 +1732,21 @@ var LayeredGrid = forwardRef(
           }
         ),
         renderCellOverlay ? overlayCells.map((cell) => {
+          const content = renderCellOverlay(cell);
+          if (content == null) {
+            return null;
+          }
+          const visual2 = layerVisualById.get(cell.layerId) ?? activeLayerVisual;
           const left = (cell.col * cellWidth + effectiveCamera.panX) * clampedScale;
-          const top = (cell.row * cellHeight + effectiveCamera.panY + activeLayerVisual.yOffset) * clampedScale;
+          const top = (cell.row * cellHeight + effectiveCamera.panY + visual2.yOffset) * clampedScale;
           const baseWidth = cellWidth * clampedScale;
           const baseHeight = cellHeight * clampedScale;
           const centerX = viewportSize.width / 2;
           const centerY = viewportSize.height / 2;
-          const width = baseWidth * activeLayerVisual.projectedScale;
-          const height = baseHeight * activeLayerVisual.projectedScale;
-          const projectedLeft = centerX + (left - centerX) * activeLayerVisual.projectedScale;
-          const projectedTop = centerY + (top - centerY) * activeLayerVisual.projectedScale;
+          const width = baseWidth * visual2.projectedScale;
+          const height = baseHeight * visual2.projectedScale;
+          const projectedLeft = centerX + (left - centerX) * visual2.projectedScale;
+          const projectedTop = centerY + (top - centerY) * visual2.projectedScale;
           return /* @__PURE__ */ jsx(
             "div",
             {
@@ -1697,9 +1756,10 @@ var LayeredGrid = forwardRef(
                 left: projectedLeft,
                 top: projectedTop,
                 width,
-                height
+                height,
+                opacity: visual2.opacity
               },
-              children: renderCellOverlay(cell)
+              children: content
             },
             cell.cellId
           );

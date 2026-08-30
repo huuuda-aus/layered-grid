@@ -29,6 +29,7 @@ import type {
   GoToCellRequest,
   LayeredGridHandle,
   LayeredGridRendererProps,
+  LayerVisual,
 } from "./types";
 
 const DEFAULT_GEOMETRY: LayeredGridGeometry = {
@@ -91,11 +92,14 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       renderCellOverlay,
       renderLayerOverlay,
       renderToolbarExtras,
+      onLayerVisualsChange,
     } = props;
 
     // Stabilize prop callbacks via refs so they never invalidate inner useCallbacks.
     const onCameraChangeIntentRef = useRef(onCameraChangeIntent);
     onCameraChangeIntentRef.current = onCameraChangeIntent;
+    const onLayerVisualsChangeRef = useRef(onLayerVisualsChange);
+    onLayerVisualsChangeRef.current = onLayerVisualsChange;
     const onLayerChangeIntentRef = useRef(onLayerChangeIntent);
     onLayerChangeIntentRef.current = onLayerChangeIntent;
     const onModeChangeIntentRef = useRef(onModeChangeIntent);
@@ -322,32 +326,49 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       [data.layers.length, mergedGeometry.depthLayerDistance, mergedGeometry.normalLayerDistance],
     );
 
+    // Every layer's cells, not just the active one — a consumer overlay
+    // (e.g. a marker on a layer you're not currently looking at) needs to be
+    // positionable anywhere, using that layer's own live transform below.
+    // renderCellOverlay itself decides what (if anything) to actually draw
+    // for a given cell, same as before; this just widens which cells it's
+    // asked about.
     const overlayCells = useMemo<CellRenderParams[]>(() => {
-      if (!renderCellOverlay || !activeLayer) {
+      if (!renderCellOverlay) {
         return [];
       }
 
-      return Object.values(activeLayer.cells).map((cell) => {
-        const cellId = resolveCellId(activeLayer.layerId, cell);
-        return {
-          layerId: activeLayer.layerId,
-          row: cell.row,
-          col: cell.col,
-          cellId,
-          visualId: resolveCellVisualId(cell),
-          isActiveLayer: true,
-          isSelected:
-            state.selection.selectedCell?.layerId === activeLayer.layerId &&
-            state.selection.selectedCell.cellId === cellId,
-          isTracked:
-            state.selection.trackedCell?.layerId === activeLayer.layerId &&
-            state.selection.trackedCell.cellId === cellId,
-          isHovered:
-            hoveredCell?.layerId === activeLayer.layerId &&
-            hoveredCell.cellId === cellId,
-        };
-      });
-    }, [activeLayer, hoveredCell, state.selection.selectedCell, state.selection.trackedCell]);
+      const cells: CellRenderParams[] = [];
+      for (const layer of data.layers) {
+        for (const cell of Object.values(layer.cells)) {
+          const cellId = resolveCellId(layer.layerId, cell);
+          cells.push({
+            layerId: layer.layerId,
+            row: cell.row,
+            col: cell.col,
+            cellId,
+            visualId: resolveCellVisualId(cell),
+            isActiveLayer: layer.layerId === state.activeLayerId,
+            isSelected:
+              state.selection.selectedCell?.layerId === layer.layerId &&
+              state.selection.selectedCell.cellId === cellId,
+            isTracked:
+              state.selection.trackedCell?.layerId === layer.layerId &&
+              state.selection.trackedCell.cellId === cellId,
+            isHovered:
+              hoveredCell?.layerId === layer.layerId &&
+              hoveredCell.cellId === cellId,
+          });
+        }
+      }
+      return cells;
+    }, [
+      data.layers,
+      state.activeLayerId,
+      hoveredCell,
+      state.selection.selectedCell,
+      state.selection.trackedCell,
+      renderCellOverlay,
+    ]);
 
     const activeLayerVisual = useMemo(() => {
       if (activeLayerIndex < 0) {
@@ -382,6 +403,54 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
       mergedGeometry.depthLayerDistance,
       mergedGeometry.normalLayerDistance,
     ]);
+
+    // Same per-layer visual (yOffset/zOffset/projectedScale/opacity), but
+    // for every layer, keyed by id — lets a cell overlay on a layer other
+    // than the active one still be positioned correctly, and follow the
+    // same live-animated tween (animatedView.focusDepth) driving the
+    // active layer's own transition, instead of snapping or drifting out
+    // of sync with it.
+    const layerVisualById = useMemo(() => {
+      const map = new Map<string, ReturnType<typeof resolveLayerVisual>>();
+      data.layers.forEach((layer, layerIndex) => {
+        map.set(
+          layer.layerId,
+          resolveLayerVisual({
+            layerIndex,
+            focusDepth: animatedView.focusDepth,
+            modeBlend: animatedView.modeBlend,
+            depthLayerDistance: mergedGeometry.depthLayerDistance,
+            normalLayerDistance: mergedGeometry.normalLayerDistance,
+            deeperLayerOpacityFalloff: mergedEffects.deeperLayerOpacityFalloff,
+            previousLayerOpacity: mergedEffects.previousLayerOpacity,
+            normalModeLayerZStep: mergedEffects.normalModeLayerZStep,
+            cameraPerspective: mergedEffects.cameraPerspective,
+          }),
+        );
+      });
+      return map;
+    }, [
+      data.layers,
+      animatedView.focusDepth,
+      animatedView.modeBlend,
+      mergedEffects.cameraPerspective,
+      mergedEffects.deeperLayerOpacityFalloff,
+      mergedEffects.normalModeLayerZStep,
+      mergedEffects.previousLayerOpacity,
+      mergedGeometry.depthLayerDistance,
+      mergedGeometry.normalLayerDistance,
+    ]);
+
+    useEffect(() => {
+      if (!onLayerVisualsChangeRef.current) {
+        return;
+      }
+      const visuals: Record<string, LayerVisual> = {};
+      layerVisualById.forEach((visual, layerId) => {
+        visuals[layerId] = visual;
+      });
+      onLayerVisualsChangeRef.current(visuals);
+    }, [layerVisualById]);
 
     useEffect(() => {
       if (transitionFrameRef.current !== null) {
@@ -1983,16 +2052,22 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
 
           {renderCellOverlay
             ? overlayCells.map((cell) => {
+                const content = renderCellOverlay(cell);
+                if (content == null) {
+                  return null;
+                }
+
+                const visual = layerVisualById.get(cell.layerId) ?? activeLayerVisual;
                 const left = (cell.col * cellWidth + effectiveCamera.panX) * clampedScale;
-                const top = (cell.row * cellHeight + effectiveCamera.panY + activeLayerVisual.yOffset) * clampedScale;
+                const top = (cell.row * cellHeight + effectiveCamera.panY + visual.yOffset) * clampedScale;
                 const baseWidth = cellWidth * clampedScale;
                 const baseHeight = cellHeight * clampedScale;
                 const centerX = viewportSize.width / 2;
                 const centerY = viewportSize.height / 2;
-                const width = baseWidth * activeLayerVisual.projectedScale;
-                const height = baseHeight * activeLayerVisual.projectedScale;
-                const projectedLeft = centerX + (left - centerX) * activeLayerVisual.projectedScale;
-                const projectedTop = centerY + (top - centerY) * activeLayerVisual.projectedScale;
+                const width = baseWidth * visual.projectedScale;
+                const height = baseHeight * visual.projectedScale;
+                const projectedLeft = centerX + (left - centerX) * visual.projectedScale;
+                const projectedTop = centerY + (top - centerY) * visual.projectedScale;
                 return (
                   <div
                     key={cell.cellId}
@@ -2003,9 +2078,10 @@ export const LayeredGrid = forwardRef<LayeredGridHandle, LayeredGridRendererProp
                       top: projectedTop,
                       width,
                       height,
+                      opacity: visual.opacity,
                     }}
                   >
-                    {renderCellOverlay(cell)}
+                    {content}
                   </div>
                 );
               })

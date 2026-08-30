@@ -16,6 +16,12 @@ type CellRenderParams = {
     isTracked: boolean;
     isHovered: boolean;
 };
+type LayerVisual = {
+    yOffset: number;
+    zOffset: number;
+    projectedScale: number;
+    opacity: number;
+};
 type LayeredGridRendererProps = {
     data: LayeredGridData;
     state: LayeredGridControlledState;
@@ -33,6 +39,7 @@ type LayeredGridRendererProps = {
     renderCellOverlay?: (params: CellRenderParams) => React__default.ReactNode;
     renderLayerOverlay?: (layerId: string) => React__default.ReactNode;
     renderToolbarExtras?: (state: LayeredGridControlledState) => React__default.ReactNode;
+    onLayerVisualsChange?: (visuals: Record<string, LayerVisual>) => void;
     className?: string;
     style?: React__default.CSSProperties;
 };
@@ -52,4 +59,4 @@ type LayeredGridHandle = {
 
 declare const LayeredGrid: React.ForwardRefExoticComponent<LayeredGridRendererProps & React.RefAttributes<LayeredGridHandle>>;
 
-export { type CellRenderParams, type GoToCellRequest, LayeredGrid, type LayeredGridHandle, type LayeredGridRendererProps };
+export { type CellRenderParams, type GoToCellRequest, type LayerVisual, LayeredGrid, type LayeredGridHandle, type LayeredGridRendererProps };

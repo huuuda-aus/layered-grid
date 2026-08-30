@@ -4,4 +4,5 @@ export type {
   GoToCellRequest,
   LayeredGridHandle,
   LayeredGridRendererProps,
+  LayerVisual,
 } from "./types";
