@@ -2240,12 +2240,22 @@ function drawOverlayLabels(
         projectedScale,
       });
       if (hoverRect) {
-        ctx.strokeStyle = "#4be3c2";
+        if (visual.hoverFillOpacity > 0) {
+          ctx.fillStyle = visual.hoverFillColor;
+          ctx.globalAlpha = opacity * visual.hoverFillOpacity;
+          ctx.fillRect(hoverRect.x, hoverRect.y, hoverRect.w, hoverRect.h);
+        }
+        ctx.strokeStyle = visual.hoverFillColor;
         ctx.lineWidth = Math.max(0.5, visual.strokeWidthAtScale1 * camera.scale);
         ctx.globalAlpha = opacity;
         ctx.strokeRect(hoverRect.x, hoverRect.y, hoverRect.w, hoverRect.h);
       }
     }
+  }
+
+  if (!visual.showCellLabels) {
+    ctx.restore();
+    return;
   }
 
   const labelCells = collectLabelTargetCells({

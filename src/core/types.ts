@@ -86,6 +86,14 @@ export type LayeredGridVisualConfig = {
   gridStrokeColor: string;
   labelColor: string;
   selectedCellStrokeColor: string;
+  // Cell coordinate text (e.g. "A1") drawn on hover/select/track — off by
+  // default consumers can just not opt in without losing hover feedback.
+  showCellLabels: boolean;
+  // Subtle fill drawn over a hovered cell, in addition to its border stroke.
+  // Any CSS color string; alpha is controlled separately via
+  // hoverFillOpacity so this can stay a plain solid color.
+  hoverFillColor: string;
+  hoverFillOpacity: number;
 
   // Per-layer border/label alpha model.
   activeLayerInkAlpha: number;

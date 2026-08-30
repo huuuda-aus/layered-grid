@@ -72,6 +72,9 @@ type LayeredGridVisualConfig = {
     gridStrokeColor: string;
     labelColor: string;
     selectedCellStrokeColor: string;
+    showCellLabels: boolean;
+    hoverFillColor: string;
+    hoverFillOpacity: number;
     activeLayerInkAlpha: number;
     belowLayerInkDecayFactor: number;
     aboveLayerInkAlpha: number;
